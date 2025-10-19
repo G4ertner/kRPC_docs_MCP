@@ -1,0 +1,9 @@
+{
+  "source": "https://krpc.github.io/krpc/",
+  "start": "https://krpc.github.io/krpc/python.html",
+  "method": "crawl",
+  "pages": 66,
+  "errors": 0,
+  "original_pages": 115,
+  "filtered": "python_plus_overview"
+}

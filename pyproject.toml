@@ -1,0 +1,43 @@
+[project]
+name = "krpc-docs"
+version = "0.1.0"
+description = "Scraper and dataset builder for kRPC Python docs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+  "mcp[cli]>=1.18.0",
+]
+
+[project.scripts]
+scrape-krpc-docs = "scripts.scrape_krpc_docs:main"
+krpc-mcp = "mcp_server.main:main"
+
+[project.optional-dependencies]
+scrape = [
+  "requests>=2.32.3",
+  "beautifulsoup4>=4.12.3",
+  "lxml>=5.3.0",
+  "sphobjinv>=2.3.1",
+  "tqdm>=4.66.5",
+  "requests-cache>=1.2.1",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = { find = { include = [
+  "krpc_index",
+  "krpc_index.*",
+  "mcp_server",
+  "mcp_server.*",
+], exclude = [
+  "data",
+  "data.*",
+  "scripts",
+  "scripts.*",
+  "tests",
+  "tests.*",
+] } }

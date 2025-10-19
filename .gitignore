@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# uv (keep lock tracked for reproducibility; comment out to ignore)
+# uv.lock
+
+# Caches / scratch
+*.sqlite
+krpc_docs_cache*
+
+# Data outputs (include main dataset + manifest; keep backups ignored)
+data/krpc_python_docs.full.jsonl
+data/errors.json
+
+# Editors
+# Editors
+.vscode/
+.idea/
+
+# Build artifacts
+*.egg-info/
