@@ -50,6 +50,17 @@ Using with Codex CLI
 - Add the server (stdio transport) so Codex can launch it as needed:
   - codex mcp add krpc_docs -- uv --directory "$HOME/krpc-docs" run -m mcp_server.main
   - or use the console script: codex mcp add krpc_docs -- uv --directory "$HOME/krpc-docs" run krpc-mcp
+
+KSP Wiki tools (English)
+- The server also exposes live KSP Wiki tools powered by the MediaWiki API:
+  - search_ksp_wiki(query: str, limit: int = 10)
+  - get_ksp_wiki_page(title: str, max_chars: int = 5000)
+- Examples in chat:
+  - Use krpc_docs to search_ksp_wiki for 'delta-v'
+  - Use krpc_docs to get_ksp_wiki_page with title 'Delta-v'
+- Local CLI for quick checks (network required):
+  - uv --directory krpc-docs run scripts/ksp_wiki_cli.py search "delta-v"
+  - uv --directory krpc-docs run scripts/ksp_wiki_cli.py get "Delta-v"
 - In chat, call tools:
   - search_krpc_docs: `Use krpc_docs to search_krpc_docs for 'autopilot'`
   - get_krpc_doc: `Use krpc_docs to get_krpc_doc with url 'https://krpc.github.io/krpc/python/client.html'`
