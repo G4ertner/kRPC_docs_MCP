@@ -60,3 +60,29 @@ def get_ksp_wiki_page(title: str, max_chars: int = 5000) -> str:
     url = f"https://wiki.kerbalspaceprogram.com/wiki/{title.replace(' ', '_')}"
     return f"{title}\n{url}\n\n{body}"
 
+
+@mcp.tool()
+def get_ksp_wiki_section(title: str, heading: str, max_chars: int = 3000) -> str:
+    """
+    Fetch a specific section from a KSP Wiki page (English).
+
+    Args:
+        title: Page title (e.g., "Maneuver node")
+        heading: Section heading to fetch (case-insensitive)
+        max_chars: Max characters to return (default 3000)
+    Returns:
+        Title + section heading + canonical URL and the section text, or a not-found message.
+    """
+    client = _get_client()
+    text = client.get_section(title, heading)
+    if not text:
+        # Provide available sections hint
+        secs = client.list_sections(title)
+        if not secs:
+            return "Section not found."
+        names = ", ".join(s for _, s in secs[:10])
+        return f"Section not found. Available sections include: {names}"
+    if len(text) > max_chars:
+        text = text[: max_chars - 1].rstrip() + "…"
+    url = f"https://wiki.kerbalspaceprogram.com/wiki/{title.replace(' ', '_')}#{heading.replace(' ', '_')}"
+    return f"{title} — {heading}\n{url}\n\n{text}"

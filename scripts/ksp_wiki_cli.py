@@ -22,6 +22,11 @@ def main() -> int:
     p_get.add_argument("title")
     p_get.add_argument("--max-chars", type=int, default=600)
 
+    p_sec = sub.add_parser("section", help="Get a specific section")
+    p_sec.add_argument("title")
+    p_sec.add_argument("heading")
+    p_sec.add_argument("--max-chars", type=int, default=600)
+
     args = ap.parse_args()
     client = KspWikiClient()
 
@@ -38,9 +43,24 @@ def main() -> int:
             text = text[: args.max_chars - 1].rstrip() + "…"
         print(text)
         return 0
+    elif args.cmd == "section":
+        text = client.get_section(args.title, args.heading)
+        if not text:
+            # Show section list hint
+            secs = client.list_sections(args.title)
+            if secs:
+                print("Section not found. Available:")
+                for _, s in secs[:10]:
+                    print(" -", s)
+            else:
+                print("Section not found.")
+            return 1
+        if len(text) > args.max_chars:
+            text = text[: args.max_chars - 1].rstrip() + "…"
+        print(text)
+        return 0
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
