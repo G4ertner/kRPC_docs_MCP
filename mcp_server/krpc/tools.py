@@ -216,6 +216,16 @@ def get_navigation_info(address: str, rpc_port: int = 50000, stream_port: int = 
 
 
 @mcp.tool()
+def get_power_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Summarize ElectricCharge status with generator/consumer counts and best-effort estimates.
+    Returns EC totals, solar exposure/output if available, and counts of RTGs, fuel cells, wheels, antennas, lights.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.power_status(conn))
+
+
+@mcp.tool()
 def list_bodies(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     conn = _connect(address, rpc_port, stream_port, name, timeout)
     return json.dumps(readers.list_bodies(conn))

@@ -1088,6 +1088,144 @@ def staging_info(conn) -> Dict[str, Any]:
     return {"current_stage": current_stage, "stages": stages}
 
 
+def power_status(conn) -> Dict[str, Any]:
+    v = conn.space_center.active_vessel
+    out: Dict[str, Any] = {"ec": {}, "generators": {}, "consumers": {}, "notes": []}
+    # ElectricCharge totals
+    try:
+        res = v.resources
+        out["ec"] = {
+            "current": res.amount("ElectricCharge"),
+            "max": res.max("ElectricCharge"),
+        }
+    except Exception:
+        out["ec"] = {"current": None, "max": None}
+
+    # Solar panels
+    solar = {"count": 0, "extended": 0, "sun_exposure_avg": None, "est_output": None}
+    flows = []
+    exposures = []
+    try:
+        panels = list(getattr(v.parts, "solar_panels", []) or [])
+        solar["count"] = len(panels)
+        for p in panels:
+            try:
+                if getattr(p, "deployable", False) and getattr(p, "deployed", False):
+                    solar["extended"] += 1
+            except Exception:
+                pass
+            for attr in ("sun_exposure", "exposure"):
+                try:
+                    val = getattr(p, attr)
+                    if val is not None:
+                        exposures.append(float(val))
+                        break
+                except Exception:
+                    continue
+            for attr in ("flow", "energy_flow", "current_flow"):
+                try:
+                    val = getattr(p, attr)
+                    if val is not None:
+                        flows.append(float(val))
+                        break
+                except Exception:
+                    continue
+        if exposures:
+            solar["sun_exposure_avg"] = sum(exposures) / len(exposures)
+        if flows:
+            solar["est_output"] = sum(flows)
+    except Exception:
+        pass
+    out["generators"]["solar"] = solar
+
+    # RTGs (best-effort: look for parts with 'RTG' in title or ModuleGenerator)
+    rtg = {"count": 0}
+    try:
+        for p in getattr(v.parts, "all", []) or []:
+            title = None
+            try:
+                title = p.title or ""
+            except Exception:
+                title = ""
+            if title and "RTG" in title:
+                rtg["count"] += 1
+                continue
+            try:
+                for m in p.modules:
+                    if getattr(m, "name", "").lower() in ("modulegenerator", "rtg"):
+                        rtg["count"] += 1
+                        break
+            except Exception:
+                continue
+    except Exception:
+        pass
+    out["generators"]["rtg"] = rtg
+
+    # Fuel cells (ModuleResourceConverter with name containing 'Fuel Cell')
+    fuel = {"count": 0, "running": 0}
+    try:
+        for p in getattr(v.parts, "all", []) or []:
+            try:
+                for m in p.modules:
+                    name = getattr(m, "name", "").lower()
+                    if "fuelcell" in name or name == "moduleresourceconverter":
+                        fuel["count"] += 1
+                        try:
+                            if getattr(m, "active", False):
+                                fuel["running"] += 1
+                        except Exception:
+                            pass
+                        break
+            except Exception:
+                continue
+    except Exception:
+        pass
+    out["generators"]["fuel_cells"] = fuel
+
+    # Reaction wheels
+    wheels = {"count": 0, "enabled": 0}
+    try:
+        rws = list(getattr(v.parts, "reaction_wheels", []) or [])
+        wheels["count"] = len(rws)
+        for rw in rws:
+            try:
+                if getattr(rw, "enabled", False):
+                    wheels["enabled"] += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    out["consumers"]["reaction_wheels"] = wheels
+
+    # Antennae
+    ants = {"count": 0}
+    try:
+        ants["count"] = len(list(getattr(v.parts, "antennas", []) or []))
+    except Exception:
+        pass
+    out["consumers"]["antennas"] = ants
+
+    # Lights
+    lights = {"count": 0, "on": 0}
+    try:
+        ls = list(getattr(v.parts, "lights", []) or [])
+        lights["count"] = len(ls)
+        for l in ls:
+            try:
+                if getattr(l, "active", False) or getattr(l, "on", False):
+                    lights["on"] += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    out["consumers"]["lights"] = lights
+
+    # Note on estimation
+    if out["generators"].get("solar", {}).get("est_output") is None:
+        out["notes"].append("Solar output estimation not available on this client; reporting counts and exposure only.")
+    return out
+
+
 def _engine_isp(e, env: str) -> float | None:
     try:
         if env == "vacuum":
