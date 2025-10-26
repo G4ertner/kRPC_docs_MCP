@@ -17,6 +17,7 @@ def main() -> int:
     ap.add_argument("--rpc-port", type=int, default=50000)
     ap.add_argument("--stream-port", type=int, default=50001)
     ap.add_argument("--name", default="StagePlan Test")
+    ap.add_argument("--env", default="current", choices=["current", "sea_level", "vacuum"])
     args = ap.parse_args()
 
     try:
@@ -25,11 +26,10 @@ def main() -> int:
         print(f"Connect failed: {e}")
         return 1
 
-    data = readers.stage_plan_approx(conn)
+    data = readers.stage_plan_approx(conn, environment=args.env)
     print(json.dumps(data, indent=2, ensure_ascii=False))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

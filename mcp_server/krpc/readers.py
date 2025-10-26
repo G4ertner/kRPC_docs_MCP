@@ -659,7 +659,28 @@ def staging_info(conn) -> Dict[str, Any]:
     return {"current_stage": current_stage, "stages": stages}
 
 
-def stage_plan_approx(conn) -> Dict[str, Any]:
+def _engine_isp(e, env: str) -> float | None:
+    try:
+        if env == "vacuum":
+            for attr in ("vacuum_specific_impulse", "isp_vacuum", "vacuum_isp"):
+                v = getattr(e, attr, None)
+                if v:
+                    return float(v)
+        elif env == "sea_level":
+            for attr in ("sea_level_specific_impulse", "isp_sea_level", "sea_level_isp"):
+                v = getattr(e, attr, None)
+                if v:
+                    return float(v)
+        # Fallback to current environment
+        v = getattr(e, "specific_impulse", None)
+        if v:
+            return float(v)
+    except Exception:
+        return None
+    return None
+
+
+def stage_plan_approx(conn, environment: str = "current") -> Dict[str, Any]:
     """
     Approximate KSP's stage DV display:
     - Split burn into subsegments labeled by stage boundaries.
@@ -714,7 +735,12 @@ def stage_plan_approx(conn) -> Dict[str, Any]:
         for e in active_eng:
             try:
                 th = float(getattr(e, "max_thrust", 0.0) or 0.0)
-                isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                if environment == "current":
+                    isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                elif environment in ("vacuum", "sea_level"):
+                    isp = _engine_isp(e, environment) or float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                else:
+                    isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
                 if th > 0 and isp > 0:
                     total_thrust += th
                     denom += th / isp

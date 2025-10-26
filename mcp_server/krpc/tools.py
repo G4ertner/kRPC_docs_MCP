@@ -189,10 +189,16 @@ def get_staging_info(address: str, rpc_port: int = 50000, stream_port: int = 500
 
 
 @mcp.tool()
-def get_stage_plan(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_stage_plan(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
     """
     Approximate stock-like staging plan by grouping decouple-only stages under the
     preceding engine stage. Returns per-engine-stage Δv, TWR, and mass flow summary.
+
+    Args:
+        environment: "current" (default), "sea_level", or "vacuum" — controls Isp used
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.stage_plan_approx(conn))
+    env = (environment or "current").lower()
+    if env not in ("current", "sea_level", "vacuum"):
+        env = "current"
+    return json.dumps(readers.stage_plan_approx(conn, environment=env))
