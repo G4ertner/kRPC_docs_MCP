@@ -20,6 +20,8 @@ def _get_client() -> KspWikiClient:
 def search_ksp_wiki(query: str, limit: int = 10) -> str:
     """
     Search the KSP Wiki (English) and return the top results.
+    When to use:
+        - Gather background on KSP mechanics, parts, or gameplay concepts.
 
     Args:
         query: Search query text
@@ -44,6 +46,8 @@ def search_ksp_wiki(query: str, limit: int = 10) -> str:
 def get_ksp_wiki_page(title: str, max_chars: int = 5000) -> str:
     """
     Fetch a KSP Wiki page in plain text (English).
+    When to use:
+        - Read a complete article for deeper context or guidance.
 
     Args:
         title: Page title (e.g., "Delta-v")
@@ -65,6 +69,8 @@ def get_ksp_wiki_page(title: str, max_chars: int = 5000) -> str:
 def get_ksp_wiki_section(title: str, heading: str, max_chars: int = 3000) -> str:
     """
     Fetch a specific section from a KSP Wiki page (English).
+    When to use:
+        - Retrieve a focused subsection (e.g., a usage guide) quickly.
 
     Args:
         title: Page title (e.g., "Maneuver node")

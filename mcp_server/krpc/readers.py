@@ -1364,3 +1364,567 @@ def stage_plan_approx(conn, environment: str = "current") -> Dict[str, Any]:
             y -= 1
 
     return {"stages": plan}
+
+
+# --- Maneuver node planners (Batch 1) ---
+
+def compute_burn_time(conn, dv_m_s: float, environment: str = "current") -> Dict[str, float | None]:
+    v = conn.space_center.active_vessel
+    # Combined thrust/Isp over currently ignitable engines (current stage)
+    engines = []
+    try:
+        cs = getattr(v.control, "current_stage", None)
+        engines = [e for e in v.parts.engines if getattr(getattr(e, 'part', None), 'stage', None) == cs]
+        if not engines:
+            engines = list(v.parts.engines)
+    except Exception:
+        engines = []
+
+    def combined_isp_thrust(active_eng):
+        total_thrust = 0.0
+        denom = 0.0
+        count = 0
+        for e in active_eng:
+            try:
+                th = float(getattr(e, 'max_thrust', 0.0) or 0.0)
+                if environment == 'current':
+                    isp = float(getattr(e, 'specific_impulse', 0.0) or 0.0)
+                else:
+                    isp = _engine_isp(e, environment) or float(getattr(e, 'specific_impulse', 0.0) or 0.0)
+                if th > 0 and isp > 0:
+                    total_thrust += th
+                    denom += th / isp
+                    count += 1
+            except Exception:
+                continue
+        isp = (total_thrust / denom) if denom > 0 else None
+        return isp, total_thrust
+
+    isp, thrust = combined_isp_thrust(engines)
+    mass = float(getattr(v, 'mass', 0.0) or 0.0)
+    simple = None
+    tsiolkovsky = None
+    if thrust and mass and dv_m_s and thrust > 0 and mass > 0:
+        simple = dv_m_s * mass / thrust
+        if isp and isp > 0:
+            # t = Isp*g0*(1 - exp(-dv/(g0*Isp))) * m0 / T
+            from math import exp
+            tsiolkovsky = (isp * G0 * (1.0 - exp(-dv_m_s / (G0 * isp))) * mass) / thrust
+    return {"mass_kg": mass, "thrust_n": thrust, "isp_s": isp, "burn_time_simple_s": simple, "burn_time_tsiolkovsky_s": tsiolkovsky}
+
+
+def propose_circularize_node(conn, at: str = 'apoapsis') -> Dict[str, float | str | None]:
+    v = conn.space_center.active_vessel
+    o = v.orbit
+    b = o.body
+    mu = getattr(b, 'gravitational_parameter', None)
+    ut = conn.space_center.ut
+    if mu is None:
+        return {"error": "Missing gravitational_parameter"}
+    if at not in ('apoapsis', 'periapsis'):
+        at = 'apoapsis'
+    if at == 'apoapsis':
+        r = getattr(o, 'apoapsis_altitude', 0.0) + getattr(b, 'equatorial_radius', 0.0)
+        t = ut + getattr(o, 'time_to_apoapsis', 0.0)
+    else:
+        r = getattr(o, 'periapsis_altitude', 0.0) + getattr(b, 'equatorial_radius', 0.0)
+        t = ut + getattr(o, 'time_to_periapsis', 0.0)
+    a = getattr(o, 'semi_major_axis', None)
+    if not a or r <= 0:
+        return {"error": "Invalid orbit or radius"}
+    from math import sqrt
+    v_circ = sqrt(mu / r)
+    v_now = sqrt(mu * (2.0 / r - 1.0 / a))
+    dv = v_circ - v_now
+    return {"ut": t, "prograde": dv, "normal": 0.0, "radial": 0.0, "r_m": r, "v_now_m_s": v_now, "v_circ_m_s": v_circ}
+
+
+def propose_plane_change_nodes(conn) -> Dict[str, object]:
+    """Return suggested plane change burns at next AN and DN if a target is set.
+    Uses target orbit plane and estimates dv ≈ 2*v*sin(Δi/2). Provides UTs and normal magnitudes.
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    cb = v.orbit.body
+    ref = getattr(cb, 'non_rotating_reference_frame', cb.reference_frame)
+    # Try target vessel, then body
+    target = getattr(v, 'target_vessel', None) or getattr(sc, 'target_vessel', None)
+    if target is None:
+        target = getattr(v, 'target_body', None) or getattr(sc, 'target_body', None)
+    if target is None:
+        return {"error": "No target set"}
+    try:
+        # Target orbit plane normal
+        rt = target.position(ref); vt = target.velocity(ref)
+        h2 = [rt[1]*vt[2]-rt[2]*vt[1], rt[2]*vt[0]-rt[0]*vt[2], rt[0]*vt[1]-rt[1]*vt[0]]
+    except Exception:
+        return {"error": "Target orbit not available"}
+    ut0 = sc.ut
+    period = getattr(v.orbit, 'period', None)
+    an_ut, dn_ut = _find_next_nodes(v.orbit, ref, h2, ut0, period)
+    from math import sin
+    out = {}
+    for kind, t in (("AN", an_ut), ("DN", dn_ut)):
+        if t:
+            try:
+                r = v.orbit.position_at(t, ref)
+                rr = sqrt(r[0]**2 + r[1]**2 + r[2]**2)
+                mu = getattr(cb, 'gravitational_parameter', None)
+                a = getattr(v.orbit, 'semi_major_axis', None)
+                if mu and a:
+                    vv = sqrt(mu * (2.0/rr - 1.0/a))
+                    # relative inclination
+                    r1 = v.position(ref); w1 = v.velocity(ref)
+                    h1 = [r1[1]*w1[2]-r1[2]*w1[1], r1[2]*w1[0]-r1[0]*w1[2], r1[0]*w1[1]-r1[1]*w1[0]]
+                    di = _vector_angle_deg(h1, h2) or 0.0
+                    dv = 2.0 * vv * sin((di * 3.141592653589793/180.0)/2.0)
+                    out[kind] = {"ut": t, "normal": dv, "prograde": 0.0, "radial": 0.0, "relative_inclination_deg": di}
+            except Exception:
+                continue
+    if not out:
+        return {"error": "Could not compute AN/DN or dv"}
+    return out
+
+
+def propose_raise_lower_node(conn, kind: str, target_alt_m: float) -> Dict[str, float | str | None]:
+    """
+    Propose a single-burn node to raise/lower apoapsis or periapsis to target_alt_m.
+    - If kind == 'apoapsis': burn at periapsis to set new apoapsis radius.
+    - If kind == 'periapsis': burn at apoapsis to set new periapsis radius.
+    Returns: {ut, prograde, normal=0, radial=0, r_burn_m, r_target_m}
+    """
+    v = conn.space_center.active_vessel
+    o = v.orbit
+    b = o.body
+    mu = getattr(b, 'gravitational_parameter', None)
+    if mu is None:
+        return {"error": "Missing gravitational_parameter"}
+    R = getattr(b, 'equatorial_radius', 0.0) or 0.0
+    atmo_depth = getattr(b, 'atmosphere_depth', 0.0) or 0.0
+    # Current radii
+    r_pe = float(getattr(o, 'periapsis_altitude', 0.0) + R)
+    r_ap = float(getattr(o, 'apoapsis_altitude', 0.0) + R)
+    a_cur = float(getattr(o, 'semi_major_axis', (r_pe + r_ap) / 2.0))
+    ut = conn.space_center.ut
+
+    kind = (kind or 'apoapsis').lower()
+    if kind not in ('apoapsis', 'periapsis'):
+        kind = 'apoapsis'
+    r_target = float(target_alt_m) + R
+    # Clamp target above min safe altitude
+    min_r = R + max(0.0, atmo_depth)
+    if r_target < min_r:
+        r_target = min_r
+
+    from math import sqrt
+    if kind == 'apoapsis':
+        # Burn at periapsis to set new apoapsis = r_target
+        r_burn = r_pe
+        t_burn = ut + getattr(o, 'time_to_periapsis', 0.0)
+        a_trans = 0.5 * (r_burn + r_target)
+        v_now = sqrt(mu * (2.0 / r_burn - 1.0 / a_cur))
+        v_trans = sqrt(mu * (2.0 / r_burn - 1.0 / a_trans))
+        dv = v_trans - v_now
+    else:
+        # Burn at apoapsis to set new periapsis = r_target
+        r_burn = r_ap
+        t_burn = ut + getattr(o, 'time_to_apoapsis', 0.0)
+        a_trans = 0.5 * (r_burn + r_target)
+        v_now = sqrt(mu * (2.0 / r_burn - 1.0 / a_cur))
+        v_trans = sqrt(mu * (2.0 / r_burn - 1.0 / a_trans))
+        dv = v_trans - v_now
+
+    return {
+        "ut": t_burn,
+        "prograde": dv,
+        "normal": 0.0,
+        "radial": 0.0,
+        "r_burn_m": r_burn,
+        "r_target_m": r_target,
+    }
+
+
+def propose_rendezvous_phase_node(conn) -> Dict[str, object]:
+    """
+    Suggest a phasing orbit to meet the target vessel in the same SOI.
+    - Computes time to alignment T from current phase and mean motions
+    - Chooses integer m s.t. m * P_phase ≈ T, with P_phase near current period
+    - Proposes a single burn at periapsis to set semi-major axis for P_phase
+    Returns: {ut, prograde, normal=0, radial=0, P_phase_s, m, T_align_s, notes}
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    target = getattr(v, 'target_vessel', None) or getattr(sc, 'target_vessel', None)
+    if target is None:
+        return {"error": "No target vessel set"}
+    cb = v.orbit.body
+    # Ensure same central body
+    if getattr(getattr(target, 'orbit', None), 'body', None) is None or target.orbit.body.name != cb.name:
+        return {"error": "Target must orbit the same body"}
+    mu = getattr(cb, 'gravitational_parameter', None)
+    if mu is None:
+        return {"error": "Missing gravitational parameter"}
+    P1 = float(getattr(v.orbit, 'period', 0.0)) or None
+    P2 = float(getattr(target.orbit, 'period', 0.0)) or None
+    if not P1 or not P2:
+        return {"error": "Missing orbital periods"}
+    ref = getattr(cb, 'non_rotating_reference_frame', cb.reference_frame)
+    try:
+        r1 = v.position(ref)
+        r2 = target.position(ref)
+        phase_now_deg = _phase_angle_deg(r1, r2)
+    except Exception:
+        phase_now_deg = None
+    from math import pi, sqrt
+    n1 = 2.0 * pi / P1
+    n2 = 2.0 * pi / P2
+    dn = n1 - n2
+    if abs(dn) < 1e-6:
+        # Very similar periods; suggest small phasing (e.g., +5% period)
+        P_phase = P1 * 1.05
+        m = 1
+        T_align = P_phase
+    else:
+        # Solve (n1 - n2) T ≈ Δθ
+        dtheta = 0.0 if phase_now_deg is None else (phase_now_deg * pi / 180.0)
+        T0 = dtheta / dn
+        # Wrap to the next positive alignment within synodic period
+        Psyn = abs(2.0 * pi / dn)
+        T = T0 % Psyn
+        if T < 1e-3:
+            T = Psyn
+        # Choose m so that P_phase near P1
+        m = max(1, int(round(T / P1)))
+        if m < 1:
+            m = 1
+        P_phase = T / m
+        T_align = T
+    # Compute required semi-major axis for P_phase
+    a_phase = (mu * (P_phase / (2.0 * pi)) ** 2) ** (1.0 / 3.0)
+    # Burn at periapsis
+    R = getattr(cb, 'equatorial_radius', 0.0) or 0.0
+    r_pe = float(getattr(v.orbit, 'periapsis_altitude', 0.0) + R)
+    a_cur = float(getattr(v.orbit, 'semi_major_axis', 0.0) or 0.0)
+    if r_pe <= 0 or a_phase <= 0 or a_cur <= 0:
+        return {"error": "Invalid orbit parameters for phasing"}
+    v_now = sqrt(mu * (2.0 / r_pe - 1.0 / a_cur))
+    v_trans = sqrt(mu * (2.0 / r_pe - 1.0 / a_phase))
+    dv = v_trans - v_now
+    ut = sc.ut + float(getattr(v.orbit, 'time_to_periapsis', 0.0) or 0.0)
+    notes = "Burn retrograde if prograde is negative." if dv < 0 else "Burn prograde."
+    return {
+        "ut": ut,
+        "prograde": dv,
+        "normal": 0.0,
+        "radial": 0.0,
+        "P_phase_s": P_phase,
+        "m": m,
+        "T_align_s": T_align,
+        "phase_now_deg": phase_now_deg,
+        "notes": notes,
+    }
+
+
+def _wrap_deg(d: float) -> float:
+    while d > 180:
+        d -= 360
+    while d < -180:
+        d += 360
+    return d
+
+
+def _wrap_deg_pos(d: float) -> float:
+    d = d % 360
+    if d < 0:
+        d += 360
+    return d
+
+
+def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, object]:
+    """
+    Estimate a Hohmann transfer window to a target body.
+    Handles two cases:
+      - Moon transfer: target orbits the vessel's current body (parent is vessel body)
+      - Interplanetary: vessel body and target share a common parent (e.g., Sun)
+    Returns: phase_now, phase_required, phase_error, time_to_window_s, ut_window, transfer_time_s
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    vb = v.orbit.body
+    tb = sc.bodies.get(target_body_name)
+    if tb is None:
+        return {"error": f"Body '{target_body_name}' not found"}
+    # Determine parent frame
+    parent_v = getattr(getattr(vb, 'orbit', None), 'reference_body', None)
+    parent_t = getattr(getattr(tb, 'orbit', None), 'reference_body', None)
+    name_vb = getattr(vb, 'name', None)
+    name_parent_v = getattr(parent_v, 'name', None)
+    name_parent_t = getattr(parent_t, 'name', None)
+    ut0 = sc.ut
+    from math import sqrt, pi
+
+    result: Dict[str, object] = {"target": getattr(tb, 'name', target_body_name)}
+
+    # Moon transfer (target orbits vessel body)
+    # Moon transfer: target orbits vessel body (compare by name to avoid proxy identity issues)
+    if name_parent_t is not None and name_parent_t == name_vb:
+        ref = getattr(vb, 'non_rotating_reference_frame', vb.reference_frame)
+        try:
+            p_v = v.position(ref)
+            p_t = tb.position(ref)
+            phase_now = _phase_angle_deg(p_v, p_t)
+        except Exception:
+            phase_now = None
+        # Radii
+        mu = getattr(vb, 'gravitational_parameter', None)
+        if mu is None:
+            return {"error": "Missing gravitational parameter for vessel body"}
+        # r1: choose burn at periapsis of current orbit
+        R = getattr(vb, 'equatorial_radius', 0.0) or 0.0
+        r1 = float(getattr(v.orbit, 'periapsis_altitude', 0.0) + R)
+        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))  # approx circular
+        a_trans = 0.5 * (r1 + r2)
+        t_trans = pi * sqrt(a_trans**3 / mu)
+        P2 = getattr(tb.orbit, 'period', None)
+        P2 = float(P2) if P2 else None
+        phase_required = None
+        if P2:
+            phase_required = 180.0 - (360.0 * (t_trans / P2))
+        # Synodic period between current orbital angular rate and moon's
+        P1 = getattr(v.orbit, 'period', None)
+        P1 = float(P1) if P1 else None
+        time_to_window = None
+        if P1 and P2 and phase_now is not None and phase_required is not None:
+            Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2)) if abs(1.0 / P1 - 1.0 / P2) > 0 else None
+            if Psyn:
+                err = _wrap_deg(phase_required - phase_now)
+                time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+        result.update({
+            "frame": "moon",
+            "r1_m": r1,
+            "r2_m": r2,
+            "transfer_time_s": t_trans,
+            "phase_now_deg": phase_now,
+            "phase_required_deg": phase_required,
+            "phase_error_deg": _wrap_deg((phase_required - phase_now) if (phase_now is not None and phase_required is not None) else 0.0) if (phase_now is not None and phase_required is not None) else None,
+            "time_to_window_s": time_to_window,
+            "ut_window": (ut0 + time_to_window) if time_to_window else None,
+        })
+        return result
+
+    # Interplanetary (common parent)
+    # Interplanetary: common parent (compare by name)
+    if name_parent_v is not None and name_parent_v == name_parent_t:
+        ref = getattr(parent_v, 'non_rotating_reference_frame', parent_v.reference_frame)
+        try:
+            p_vb = vb.position(ref)
+            p_tb = tb.position(ref)
+            phase_now = _phase_angle_deg(p_vb, p_tb)
+        except Exception:
+            phase_now = None
+        mu = getattr(parent_v, 'gravitational_parameter', None)
+        if mu is None:
+            return {"error": "Missing gravitational parameter for common parent"}
+        # Radii: use semi-major axes (approx circular)
+        r1 = float(getattr(vb.orbit, 'semi_major_axis', 0.0))
+        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
+        a_trans = 0.5 * (r1 + r2)
+        t_trans = pi * sqrt(a_trans**3 / mu)
+        P1 = float(getattr(vb.orbit, 'period', 0.0)) or None
+        P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
+        if r1 <= 0 or r2 <= 0 or not P1 or not P2:
+            return {"error": "Invalid orbital parameters"}
+        if r1 < r2:
+            phase_required = 180.0 - (360.0 * (t_trans / P2))
+        else:
+            phase_required = 180.0 + (360.0 * (t_trans / P1))
+        Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
+        time_to_window = None
+        if phase_now is not None:
+            err = _wrap_deg(phase_required - phase_now)
+            time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+        result.update({
+            "frame": "interplanetary",
+            "r1_m": r1,
+            "r2_m": r2,
+            "transfer_time_s": t_trans,
+            "phase_now_deg": phase_now,
+            "phase_required_deg": phase_required,
+            "phase_error_deg": _wrap_deg((phase_required - phase_now) if phase_now is not None else 0.0) if phase_now is not None else None,
+            "time_to_window_s": time_to_window,
+            "ut_window": (ut0 + time_to_window) if time_to_window else None,
+        })
+        return result
+
+    # Fallbacks using star inference
+    try:
+        bodies = getattr(sc, 'bodies', {}) or {}
+        star = max(bodies.values(), key=lambda b: float(getattr(b, 'gravitational_parameter', 0.0) or 0.0))
+        name_star = getattr(star, 'name', None)
+    except Exception:
+        star = None; name_star = None
+
+    # If both effectively orbit the star (parents missing but likely star), treat as interplanetary
+    if name_star and ((name_parent_v in (None, name_star)) and (name_parent_t in (None, name_star))):
+        ref = getattr(star, 'non_rotating_reference_frame', getattr(star, 'reference_frame', None))
+        try:
+            p_vb = vb.position(ref)
+            p_tb = tb.position(ref)
+            phase_now = _phase_angle_deg(p_vb, p_tb)
+        except Exception:
+            phase_now = None
+        mu = getattr(star, 'gravitational_parameter', None)
+        if mu is None:
+            return {"error": "Missing gravitational parameter for star"}
+        from math import sqrt, pi
+        r1 = float(getattr(vb.orbit, 'semi_major_axis', 0.0))
+        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
+        if r1 > 0 and r2 > 0:
+            a_trans = 0.5 * (r1 + r2)
+            t_trans = pi * sqrt(a_trans**3 / mu)
+            P1 = float(getattr(vb.orbit, 'period', 0.0)) or None
+            P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
+            if P1 and P2:
+                if r1 < r2:
+                    phase_required = 180.0 - (360.0 * (t_trans / P2))
+                else:
+                    phase_required = 180.0 + (360.0 * (t_trans / P1))
+                Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
+                time_to_window = None
+                if phase_now is not None:
+                    err = _wrap_deg(phase_required - phase_now)
+                    time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+                return {
+                    "frame": "interplanetary",
+                    "r1_m": r1,
+                    "r2_m": r2,
+                    "transfer_time_s": t_trans,
+                    "phase_now_deg": phase_now,
+                    "phase_required_deg": phase_required,
+                    "phase_error_deg": _wrap_deg((phase_required - phase_now) if phase_now is not None else 0.0) if phase_now is not None else None,
+                    "time_to_window_s": time_to_window,
+                    "ut_window": (ut0 + time_to_window) if time_to_window else None,
+                }
+
+    # Heuristic moon-case fallback: if target SMA is much less than your body's SOI, treat as moon case
+    try:
+        mu = getattr(vb, 'gravitational_parameter', None)
+        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
+        soi = float(getattr(vb, 'sphere_of_influence', 0.0))
+        if mu and r2 and soi and r2 < 0.8 * soi:
+            ref = getattr(vb, 'non_rotating_reference_frame', vb.reference_frame)
+            p_v = v.position(ref); p_t = tb.position(ref)
+            phase_now = _phase_angle_deg(p_v, p_t)
+            from math import sqrt, pi
+            R = getattr(vb, 'equatorial_radius', 0.0) or 0.0
+            r1 = float(getattr(v.orbit, 'periapsis_altitude', 0.0) + R)
+            a_trans = 0.5 * (r1 + r2)
+            t_trans = pi * sqrt(a_trans**3 / mu)
+            P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
+            phase_required = 180.0 - (360.0 * (t_trans / P2)) if P2 else None
+            P1 = float(getattr(v.orbit, 'period', 0.0)) or None
+            time_to_window = None
+            if P1 and P2 and phase_now is not None and phase_required is not None:
+                Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2)) if abs(1.0 / P1 - 1.0 / P2) > 0 else None
+                if Psyn:
+                    err = _wrap_deg(phase_required - phase_now)
+                    time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+            return {
+                "frame": "moon",
+                "r1_m": r1,
+                "r2_m": r2,
+                "transfer_time_s": t_trans,
+                "phase_now_deg": phase_now,
+                "phase_required_deg": phase_required,
+                "phase_error_deg": _wrap_deg((phase_required - phase_now) if (phase_now is not None and phase_required is not None) else 0.0) if (phase_now is not None and phase_required is not None) else None,
+                "time_to_window_s": time_to_window,
+                "ut_window": (ut0 + time_to_window) if time_to_window else None,
+            }
+    except Exception:
+        pass
+
+    return {"error": "Target body must be a moon of the current body or share a parent with it"}
+
+
+def propose_ejection_node_to_body(conn, target_body_name: str, parking_alt_m: float, environment: str = 'current') -> Dict[str, object]:
+    """
+    Coarse ejection burn estimate for interplanetary transfers.
+    - Computes v_inf from Hohmann transfer at origin orbit and maps to parking orbit ejection dv.
+    - Returns a node at UT_window (from transfer_window), prograde-only suggestion.
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    vb = v.orbit.body
+    tb = sc.bodies.get(target_body_name)
+    if tb is None:
+        return {"error": f"Body '{target_body_name}' not found"}
+    parent_v = getattr(getattr(vb, 'orbit', None), 'reference_body', None)
+    parent_t = getattr(getattr(tb, 'orbit', None), 'reference_body', None)
+    name_parent_v = getattr(parent_v, 'name', None)
+    name_parent_t = getattr(parent_t, 'name', None)
+    if name_parent_v is None or name_parent_v != name_parent_t:
+        # Fallback: assume star common parent if both appear to orbit the star by largest mu
+        bodies = getattr(sc, 'bodies', {}) or {}
+        try:
+            star = max(bodies.values(), key=lambda b: float(getattr(b, 'gravitational_parameter', 0.0) or 0.0))
+            name_star = getattr(star, 'name', None)
+        except Exception:
+            star = None; name_star = None
+        if not name_star or (name_parent_v not in (None, name_star)) or (name_parent_t not in (None, name_star)):
+            return {"error": "Ejection node is only defined for interplanetary transfers (common parent)"}
+        # Use star as parent for frame and mu
+        parent_v = star
+    # Parent parameters
+    mu_p = getattr(parent_v, 'gravitational_parameter', None)
+    if mu_p is None:
+        return {"error": "Missing gravitational parameter for common parent"}
+    from math import sqrt, pi
+    r1 = float(getattr(vb.orbit, 'semi_major_axis', 0.0))
+    r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
+    a_trans = 0.5 * (r1 + r2)
+    t_trans = pi * sqrt(a_trans**3 / mu_p)
+    P1 = float(getattr(vb.orbit, 'period', 0.0)) or None
+    P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
+    if r1 <= 0 or r2 <= 0 or not P1 or not P2:
+        return {"error": "Invalid orbital parameters"}
+    if r1 < r2:
+        phase_required = 180.0 - (360.0 * (t_trans / P2))
+    else:
+        phase_required = 180.0 + (360.0 * (t_trans / P1))
+    # Current phase
+    ref = getattr(parent_v, 'non_rotating_reference_frame', parent_v.reference_frame)
+    try:
+        p_vb = vb.position(ref)
+        p_tb = tb.position(ref)
+        phase_now = _phase_angle_deg(p_vb, p_tb)
+    except Exception:
+        phase_now = None
+    Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
+    time_to_window = None
+    if phase_now is not None:
+        err = _wrap_deg(phase_required - phase_now)
+        time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+    ut_window = (sc.ut + time_to_window) if time_to_window else None
+    # v_inf at departure
+    v1 = sqrt(mu_p / r1)
+    v_trans1 = sqrt(mu_p * (2.0 / r1 - 1.0 / a_trans))
+    v_inf = abs(v_trans1 - v1)
+    # Map v_inf to parking orbit ejection dv
+    mu_b = getattr(vb, 'gravitational_parameter', None)
+    Rb = getattr(vb, 'equatorial_radius', 0.0) or 0.0
+    r_orbit = Rb + float(parking_alt_m)
+    v_circ = sqrt(mu_b / r_orbit)
+    v_esc = sqrt(2.0 * mu_b / r_orbit)
+    dv_eject = sqrt(v_inf * v_inf + v_esc * v_esc) - v_circ
+    return {
+        "ut": ut_window,
+        "prograde": dv_eject,
+        "normal": 0.0,
+        "radial": 0.0,
+        "phase_now_deg": phase_now,
+        "phase_required_deg": phase_required,
+        "time_to_window_s": time_to_window,
+        "v_inf_m_s": v_inf,
+        "parking_alt_m": parking_alt_m,
+        "notes": "Coarse ejection estimate. Refine ejection angle and add small normal/radial as needed.",
+    }
