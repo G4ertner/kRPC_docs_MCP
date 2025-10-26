@@ -113,3 +113,86 @@ def get_status_overview(address: str, rpc_port: int = 50000, stream_port: int = 
         "maneuver_nodes": readers.maneuver_nodes_basic(conn),
     }
     return json.dumps(out)
+
+
+# Medium batch 1: engines, resources, surface
+
+@mcp.tool()
+def get_engine_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.engine_status(conn))
+
+
+@mcp.tool()
+def get_resource_breakdown(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.resource_breakdown(conn))
+
+
+@mcp.tool()
+def get_surface_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.surface_info(conn))
+
+
+# Medium batch 2: targeting, detailed nodes, docking ports
+
+@mcp.tool()
+def get_targeting_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.targeting_info(conn))
+
+
+@mcp.tool()
+def list_maneuver_nodes_detailed(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.maneuver_nodes_detailed(conn))
+
+
+@mcp.tool()
+def list_docking_ports(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.docking_ports(conn))
+
+
+# Medium batch 3: camera, waypoints, contracts summary (best-effort)
+
+@mcp.tool()
+def get_camera_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.camera_status(conn))
+
+
+@mcp.tool()
+def list_waypoints(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.list_waypoints(conn))
+
+
+@mcp.tool()
+def get_action_groups_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.action_groups_status(conn))
+
+
+# Hard: staging with per-stage delta-v (approximate)
+
+@mcp.tool()
+def get_staging_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Approximate per-stage delta-v and TWR plan, using current engine Isp and resource masses.
+
+    Note: Uses standard KSP resource densities and current environment Isp; results are estimates.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.staging_info(conn))
+
+
+@mcp.tool()
+def get_stage_plan(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Approximate stock-like staging plan by grouping decouple-only stages under the
+    preceding engine stage. Returns per-engine-stage Δv, TWR, and mass flow summary.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.stage_plan_approx(conn))
