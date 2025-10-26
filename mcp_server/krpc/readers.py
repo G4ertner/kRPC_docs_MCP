@@ -661,82 +661,113 @@ def staging_info(conn) -> Dict[str, Any]:
 
 def stage_plan_approx(conn) -> Dict[str, Any]:
     """
-    Group stages by engine-ignition stages and attribute propellant from intervening
-    decouple-only stages to the preceding engine stage. This approximates the stock
-    staging Δv breakdown without modeling detailed fuel flow.
+    Approximate KSP's stage DV display:
+    - Split burn into subsegments labeled by stage boundaries.
+    - For each engine ignition stage, iterate down through subsequent decouple stages.
+      For subsegment labeled Y, use only propellant in stage Y-1, then decouple dry mass at Y.
+    - Update engine set when engines are decoupled at Y.
+    This yields small DV portions at early strap-on drops and a large DV portion for the
+    core stage, matching stock staging intuition.
     """
     v = conn.space_center.active_vessel
     body = v.orbit.body
     g = float(getattr(body, "surface_gravity", 9.81) or 9.81)
 
-    # Collect engine stages and per-stage props/drops
-    engine_stages = set()
+    # Precompute per-stage propellant and dry mass drop
+    current_stage = getattr(v.control, "current_stage", 0)
+    # Determine min/max stage indices to consider
+    min_stage = 0
+    max_stage = 0
     try:
-        for e in v.parts.engines:
-            st = getattr(getattr(e, "part", None), "stage", None)
-            if isinstance(st, int):
-                engine_stages.add(st)
+        max_stage = max([current_stage] + [getattr(getattr(e, "part", None), "stage", 0) for e in v.parts.engines])
     except Exception:
-        pass
-    if not engine_stages:
+        max_stage = current_stage
+    prop_by_stage = {s: _stage_prop_mass_kg(conn, s) for s in range(max_stage, min_stage - 1, -1)}
+    drop_by_stage = {s: _stage_dry_drop_mass_kg(conn, s) for s in range(max_stage, min_stage - 1, -1)}
+
+    # Build ignition stages and engine membership
+    engines_all = []
+    try:
+        engines_all = list(v.parts.engines)
+    except Exception:
+        engines_all = []
+    def engine_ignition_stage(e):
+        try:
+            return int(getattr(getattr(e, "part", None), "stage", 0))
+        except Exception:
+            return 0
+    def engine_decouple_stage(e):
+        try:
+            return int(getattr(getattr(e, "part", None), "decouple_stage", -1))
+        except Exception:
+            return -1
+
+    ignition_stages = sorted({engine_ignition_stage(e) for e in engines_all}, reverse=True)
+    if not ignition_stages:
         return {"stages": []}
 
-    current_stage = getattr(v.control, "current_stage", 0)
-    min_stage = 0
-    max_stage = max([current_stage] + list(engine_stages))
-
-    prop_by_stage = {}
-    drop_by_stage = {}
-    for s in range(max_stage, min_stage - 1, -1):
-        prop_by_stage[s] = _stage_prop_mass_kg(conn, s)
-        drop_by_stage[s] = _stage_dry_drop_mass_kg(conn, s)
-
-    # Engine aggregates per stage
-    engine_info = {}
-    for s in engine_stages:
-        isp, thrust, count = _combined_isp_and_thrust_for_stage(conn, s)
-        engine_info[s] = {"isp": isp, "thrust": thrust, "count": count}
-
-    # Descending list of engine stages at/above current
-    eng_stages_sorted = sorted([s for s in engine_stages if s <= max_stage], reverse=True)
+    # Helper: combined Isp/thrust for a set of engines
+    def combined_isp_thrust(active_eng):
+        total_thrust = 0.0
+        denom = 0.0
+        count = 0
+        for e in active_eng:
+            try:
+                th = float(getattr(e, "max_thrust", 0.0) or 0.0)
+                isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                if th > 0 and isp > 0:
+                    total_thrust += th
+                    denom += th / isp
+                    count += 1
+            except Exception:
+                continue
+        isp = (total_thrust / denom) if denom > 0 else None
+        return isp, total_thrust, count
 
     mass_current = float(getattr(v, "mass", 0.0) or 0.0)
     plan = []
-    for i, s in enumerate(eng_stages_sorted):
-        # Only consider stages down to next engine stage (exclusive)
-        s_next = eng_stages_sorted[i + 1] if i + 1 < len(eng_stages_sorted) else -1
-        # Sum propellant in s, and intervening decouple stages > s_next
-        sum_prop = 0.0
-        for y in range(s, s_next, -1):
-            sum_prop += prop_by_stage.get(y, 0.0)
-        info = engine_info.get(s, {})
-        isp = info.get("isp")
-        thrust = info.get("thrust")
-        count = info.get("count") or 0
-        dv = None
-        twr = None
-        if thrust and g > 0 and mass_current > 0:
-            twr = thrust / (mass_current * g)
-        if isp and isp > 0 and sum_prop > 0 and mass_current > sum_prop:
-            from math import log
-            dv = G0 * isp * log(mass_current / (mass_current - sum_prop))
 
-        plan.append({
-            "stage": s,
-            "engines": int(count),
-            "max_thrust_n": thrust,
-            "combined_isp_s": isp,
-            "prop_mass_kg": sum_prop,
-            "m0_kg": mass_current,
-            "m1_kg": max(0.1, mass_current - sum_prop),
-            "delta_v_m_s": dv,
-            "twr_surface": twr,
-        })
+    for idx, s in enumerate(ignition_stages):
+        # Active engines: those ignited at stage s and not yet decoupled
+        active_eng = [e for e in engines_all if engine_ignition_stage(e) == s]
 
-        # Update mass: burn propellant for this segment
-        mass_current = max(0.1, mass_current - sum_prop)
-        # Then drop any decoupled dry mass up to (but not including) next engine stage
-        for y in range(s, s_next, -1):
+        # Subsegments run from label y = s down to just above next ignition stage
+        s_next = ignition_stages[idx + 1] if idx + 1 < len(ignition_stages) else -1
+        y = s
+        while y > s_next:
+            # DV labeled at stage y comes from prop in stage y-1 (fuel burned before staging y)
+            prop = prop_by_stage.get(y - 1, 0.0)
+            isp, thrust, count = combined_isp_thrust(active_eng)
+            dv = None
+            twr = None
+            if thrust and g > 0 and mass_current > 0:
+                twr = thrust / (mass_current * g)
+            if isp and isp > 0 and prop > 0 and mass_current > prop:
+                from math import log
+                dv = G0 * isp * log(mass_current / (mass_current - prop))
+
+            plan.append({
+                "stage": y,
+                "engines": int(count or 0),
+                "max_thrust_n": thrust,
+                "combined_isp_s": isp,
+                "prop_mass_kg": prop,
+                "m0_kg": mass_current,
+                "m1_kg": max(0.1, mass_current - prop),
+                "delta_v_m_s": dv,
+                "twr_surface": twr,
+            })
+
+            # Burn prop
+            mass_current = max(0.1, mass_current - prop)
+            # Stage y: decouple any engines/parts
+            # Remove engines whose decouple_stage == y
+            try:
+                active_eng = [e for e in active_eng if engine_decouple_stage(e) != y]
+            except Exception:
+                pass
+            # Drop dry mass
             mass_current = max(0.1, mass_current - drop_by_stage.get(y, 0.0))
+            y -= 1
 
     return {"stages": plan}
