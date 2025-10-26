@@ -318,6 +318,7 @@ def targeting_info(conn) -> Dict[str, Any]:
     out: Dict[str, Any] = {"target_type": None, "target_name": None}
     body = v.orbit.body
     ref = getattr(body, "non_rotating_reference_frame", body.reference_frame)
+    sc = conn.space_center
     try:
         tv = v.target_vessel
         if tv is not None:
@@ -337,6 +338,16 @@ def targeting_info(conn) -> Dict[str, Any]:
             return out
     except Exception:
         pass
+    # Fallback: some clients expose target via SpaceCenter
+    try:
+        tv2 = getattr(sc, "target_vessel", None)
+        if tv2 is not None:
+            out["target_type"] = "vessel"
+            out["target_name"] = tv2.name
+            return out
+    except Exception:
+        pass
+
     try:
         tb = v.target_body
         if tb is not None:
@@ -370,6 +381,16 @@ def targeting_info(conn) -> Dict[str, Any]:
             return out
     except Exception:
         pass
+    # Fallback: SpaceCenter-level target body
+    try:
+        tb2 = getattr(sc, "target_body", None)
+        if tb2 is not None:
+            out["target_type"] = "body"
+            out["target_name"] = tb2.name
+            return out
+    except Exception:
+        pass
+
     out["target_type"] = None
     return out
 
@@ -540,6 +561,414 @@ def action_groups_status(conn) -> Dict[str, Any]:
                     out[f"custom_{i}"] = bool(ctrl.get_action_group(i))
                 except Exception:
                     out[f"custom_{i}"] = None
+    except Exception:
+        pass
+    return out
+
+
+def _vector_angle_deg(a, b) -> float | None:
+    try:
+        ax, ay, az = a
+        bx, by, bz = b
+        dot = ax * bx + ay * by + az * bz
+        na = sqrt(ax * ax + ay * ay + az * az)
+        nb = sqrt(bx * bx + by * by + bz * bz)
+        if na == 0 or nb == 0:
+            return None
+        c = max(-1.0, min(1.0, dot / (na * nb)))
+        from math import acos
+        return acos(c) * 180.0 / 3.141592653589793
+    except Exception:
+        return None
+
+
+def _phase_angle_deg(p1, p2) -> float | None:
+    """Return the polar angle difference between two position vectors in a plane.
+    Uses atan2 on the x-y projection; suitable for coarse phase planning.
+    """
+    try:
+        x1, y1 = float(p1[0]), float(p1[1])
+        x2, y2 = float(p2[0]), float(p2[1])
+        a1 = atan2(y1, x1)
+        a2 = atan2(y2, x2)
+        d = (a2 - a1) * 180.0 / 3.141592653589793
+        # Normalize to [-180, 180]
+        while d > 180:
+            d -= 360
+        while d < -180:
+            d += 360
+        return d
+    except Exception:
+        return None
+
+
+def _normalize(v):
+    try:
+        nx = float(v[0]); ny = float(v[1]); nz = float(v[2])
+        n = sqrt(nx*nx + ny*ny + nz*nz)
+        if n == 0:
+            return None
+        return [nx/n, ny/n, nz/n]
+    except Exception:
+        return None
+
+
+def _find_next_nodes(orbit, ref, plane_normal, ut0, period):
+    """
+    Find next ascending/descending node times where position crosses the plane
+    with normal 'plane_normal'. Uses sampling+bisection over one period.
+    Returns (an_ut, dn_ut) or None values.
+    """
+    n_hat = _normalize(plane_normal)
+    if n_hat is None or period is None or period <= 0:
+        return None, None
+    N = 120
+    dt = max(period / N, 0.5)
+    last_s = None
+    last_ut = None
+    nodes = []
+    t = ut0
+    for _ in range(N+1):
+        try:
+            r = orbit.position_at(t, ref)
+        except Exception:
+            break
+        s = r[0]*n_hat[0] + r[1]*n_hat[1] + r[2]*n_hat[2]
+        ut_node = None
+        if last_s is not None and s == 0:
+            ut_node = t
+        elif last_s is not None and last_s * s < 0:
+            a = last_ut; b = t
+            fa = last_s; fb = s
+            for __ in range(20):
+                m = 0.5*(a+b)
+                try:
+                    rm = orbit.position_at(m, ref)
+                except Exception:
+                    break
+                fm = rm[0]*n_hat[0] + rm[1]*n_hat[1] + rm[2]*n_hat[2]
+                if fm == 0:
+                    a = b = m
+                    break
+                if fa * fm <= 0:
+                    b = m; fb = fm
+                else:
+                    a = m; fa = fm
+            ut_node = 0.5*(a+b)
+        if ut_node is not None:
+            sign = 0.0
+            try:
+                vel = orbit.velocity_at(ut_node, ref)
+                sign = vel[0]*n_hat[0] + vel[1]*n_hat[1] + vel[2]*n_hat[2]
+            except Exception:
+                pass
+            nodes.append((ut_node, 'AN' if sign > 0 else 'DN'))
+            if len(nodes) >= 2:
+                break
+        last_s = s; last_ut = t
+        t += dt
+    an_ut = next((ut for ut, kind in nodes if kind == 'AN'), None)
+    dn_ut = next((ut for ut, kind in nodes if kind == 'DN'), None)
+    return an_ut, dn_ut
+
+
+def navigation_info(conn) -> Dict[str, Any]:
+    """
+    Provide coarse navigation info to a body or vessel target.
+
+    For target body:
+      - phase_angle_deg around common parent (if available)
+      - target orbital elements (sma, period, inclination, LAN)
+    For target vessel:
+      - distance, relative_speed
+      - relative_inclination_deg (angle between orbital planes)
+      - phase_angle_deg around central body (if both orbit same)
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    out: Dict[str, Any] = {"target_type": None}
+
+    # Try vessel target first
+    try:
+        tv = v.target_vessel
+        if tv is not None:
+            out["target_type"] = "vessel"
+            out["name"] = tv.name
+            cb = v.orbit.body
+            ref = getattr(cb, "non_rotating_reference_frame", cb.reference_frame)
+            try:
+                vp = v.position(ref)
+                vv = v.velocity(ref)
+                tp = tv.position(ref)
+                tvv = tv.velocity(ref)
+                dp = [tp[i] - vp[i] for i in range(3)]
+                dv = [tvv[i] - vv[i] for i in range(3)]
+                out["distance_m"] = sqrt(dp[0] ** 2 + dp[1] ** 2 + dp[2] ** 2)
+                out["relative_speed_m_s"] = sqrt(dv[0] ** 2 + dv[1] ** 2 + dv[2] ** 2)
+            except Exception:
+                pass
+            # Relative inclination via orbit normals (if both orbit the same central body)
+            try:
+                ref_parent = getattr(cb, "non_rotating_reference_frame", cb.reference_frame)
+                # Current normal
+                r1 = v.position(ref_parent)
+                w1 = v.velocity(ref_parent)
+                h1 = [
+                    r1[1] * w1[2] - r1[2] * w1[1],
+                    r1[2] * w1[0] - r1[0] * w1[2],
+                    r1[0] * w1[1] - r1[1] * w1[0],
+                ]
+                # Target normal
+                r2 = tv.position(ref_parent)
+                w2 = tv.velocity(ref_parent)
+                h2 = [
+                    r2[1] * w2[2] - r2[2] * w2[1],
+                    r2[2] * w2[0] - r2[0] * w2[2],
+                    r2[0] * w2[1] - r2[1] * w2[0],
+                ]
+                out["relative_inclination_deg"] = _vector_angle_deg(h1, h2)
+                out["phase_angle_deg"] = _phase_angle_deg(r1, r2)
+                # Next AN/DN estimates
+                ut0 = sc.ut
+                period = getattr(v.orbit, 'period', None)
+                an_ut, dn_ut = _find_next_nodes(v.orbit, ref_parent, h2, ut0, period)
+                if an_ut:
+                    out["next_an_ut"] = an_ut
+                    out["time_to_an_s"] = an_ut - ut0
+                if dn_ut:
+                    out["next_dn_ut"] = dn_ut
+                    out["time_to_dn_s"] = dn_ut - ut0
+            except Exception:
+                pass
+            return out
+    except Exception:
+        pass
+
+    # Try body target
+    # Fallback: SpaceCenter-level target vessel
+    try:
+        tv2 = getattr(sc, "target_vessel", None)
+        if tv2 is not None:
+            tv = tv2
+            out["target_type"] = "vessel"
+            out["name"] = tv.name
+            cb = v.orbit.body
+            ref = getattr(cb, "non_rotating_reference_frame", cb.reference_frame)
+            try:
+                vp = v.position(ref)
+                vv = v.velocity(ref)
+                tp = tv.position(ref)
+                tvv = tv.velocity(ref)
+                dp = [tp[i] - vp[i] for i in range(3)]
+                dv = [tvv[i] - vv[i] for i in range(3)]
+                out["distance_m"] = sqrt(dp[0] ** 2 + dp[1] ** 2 + dp[2] ** 2)
+                out["relative_speed_m_s"] = sqrt(dv[0] ** 2 + dv[1] ** 2 + dv[2] ** 2)
+            except Exception:
+                pass
+            try:
+                ref_parent = getattr(cb, "non_rotating_reference_frame", cb.reference_frame)
+                r1 = v.position(ref_parent); w1 = v.velocity(ref_parent)
+                h1 = [r1[1]*w1[2]-r1[2]*w1[1], r1[2]*w1[0]-r1[0]*w1[2], r1[0]*w1[1]-r1[1]*w1[0]]
+                r2 = tv.position(ref_parent); w2 = tv.velocity(ref_parent)
+                h2 = [r2[1]*w2[2]-r2[2]*w2[1], r2[2]*w2[0]-r2[0]*w2[2], r2[0]*w2[1]-r2[1]*w2[0]]
+                out["relative_inclination_deg"] = _vector_angle_deg(h1, h2)
+                out["phase_angle_deg"] = _phase_angle_deg(r1, r2)
+            except Exception:
+                pass
+            return out
+    except Exception:
+        pass
+
+    try:
+        tb = v.target_body
+        if tb is not None:
+            out["target_type"] = "body"
+            out["name"] = tb.name
+            vb = v.orbit.body
+            parent_v = getattr(getattr(vb, "orbit", None), "reference_body", None)
+            parent_t = getattr(getattr(tb, "orbit", None), "reference_body", None)
+
+            # Case 1: target is a moon of the vessel's body (e.g., Mun while orbiting Kerbin)
+            try:
+                if parent_t is not None and parent_t == vb:
+                    ref = getattr(vb, "non_rotating_reference_frame", vb.reference_frame)
+                    p_v = v.position(ref)
+                    p_t = tb.position(ref)
+                    out["phase_angle_deg"] = _phase_angle_deg(p_v, p_t)
+                    # h2: target body's orbit plane normal around vb
+                    vt = tb.velocity(ref); rt = tb.position(ref)
+                    h2 = [rt[1]*vt[2]-rt[2]*vt[1], rt[2]*vt[0]-rt[0]*vt[2], rt[0]*vt[1]-rt[1]*vt[0]]
+                    ut0 = sc.ut
+                    period = getattr(v.orbit, 'period', None)
+                    an_ut, dn_ut = _find_next_nodes(v.orbit, ref, h2, ut0, period)
+                    if an_ut:
+                        out["next_an_ut"] = an_ut
+                        out["time_to_an_s"] = an_ut - ut0
+                    if dn_ut:
+                        out["next_dn_ut"] = dn_ut
+                        out["time_to_dn_s"] = dn_ut - ut0
+            except Exception:
+                pass
+
+            # Case 2: both bodies share a common parent (e.g., interplanetary transfers)
+            try:
+                if parent_v is not None and parent_v == parent_t:
+                    ref = getattr(parent_v, "non_rotating_reference_frame", parent_v.reference_frame)
+                    p_vb = vb.position(ref)
+                    p_tb = tb.position(ref)
+                    out.setdefault("phase_angle_deg", _phase_angle_deg(p_vb, p_tb))
+                    # Use target body's orbital plane around common parent
+                    vt = tb.velocity(ref); rt = tb.position(ref)
+                    h2 = [rt[1]*vt[2]-rt[2]*vt[1], rt[2]*vt[0]-rt[0]*vt[2], rt[0]*vt[1]-rt[1]*vt[0]]
+                    ut0 = sc.ut
+                    period = getattr(v.orbit, 'period', None)
+                    an_ut, dn_ut = _find_next_nodes(v.orbit, ref, h2, ut0, period)
+                    if an_ut:
+                        out["next_an_ut"] = an_ut
+                        out["time_to_an_s"] = an_ut - ut0
+                    if dn_ut:
+                        out["next_dn_ut"] = dn_ut
+                        out["time_to_dn_s"] = dn_ut - ut0
+            except Exception:
+                pass
+
+            # Basic orbital elements of target
+            try:
+                o = tb.orbit
+                out["target_sma_m"] = getattr(o, "semi_major_axis", None)
+                out["target_period_s"] = getattr(o, "period", None)
+                out["target_inclination_deg"] = getattr(o, "inclination", None)
+                out["target_lan_deg"] = getattr(o, "longitude_of_ascending_node", None)
+            except Exception:
+                pass
+            return out
+    except Exception:
+        pass
+
+    # Fallback: SpaceCenter-level target body
+    try:
+        tb2 = getattr(sc, "target_body", None)
+        if tb2 is not None:
+            out["target_type"] = "body"
+            out["name"] = tb2.name
+            vb = v.orbit.body
+            parent_v = getattr(getattr(vb, "orbit", None), "reference_body", None)
+            parent_t = getattr(getattr(tb2, "orbit", None), "reference_body", None)
+
+            # Moon-of-vessel-body case
+            try:
+                if parent_t is not None and parent_t == vb:
+                    ref = getattr(vb, "non_rotating_reference_frame", vb.reference_frame)
+                    p_v = v.position(ref)
+                    p_t = tb2.position(ref)
+                    out["phase_angle_deg"] = _phase_angle_deg(p_v, p_t)
+                    vt = tb2.velocity(ref); rt = tb2.position(ref)
+                    h2 = [rt[1]*vt[2]-rt[2]*vt[1], rt[2]*vt[0]-rt[0]*vt[2], rt[0]*vt[1]-rt[1]*vt[0]]
+                    ut0 = sc.ut
+                    period = getattr(v.orbit, 'period', None)
+                    an_ut, dn_ut = _find_next_nodes(v.orbit, ref, h2, ut0, period)
+                    if an_ut:
+                        out["next_an_ut"] = an_ut
+                        out["time_to_an_s"] = an_ut - ut0
+                    if dn_ut:
+                        out["next_dn_ut"] = dn_ut
+                        out["time_to_dn_s"] = dn_ut - ut0
+            except Exception:
+                pass
+
+            # Common parent case
+            try:
+                if parent_v is not None and parent_v == parent_t:
+                    ref = getattr(parent_v, "non_rotating_reference_frame", parent_v.reference_frame)
+                    p_vb = vb.position(ref)
+                    p_tb = tb2.position(ref)
+                    out.setdefault("phase_angle_deg", _phase_angle_deg(p_vb, p_tb))
+                    vt = tb2.velocity(ref); rt = tb2.position(ref)
+                    h2 = [rt[1]*vt[2]-rt[2]*vt[1], rt[2]*vt[0]-rt[0]*vt[2], rt[0]*vt[1]-rt[1]*vt[0]]
+                    ut0 = sc.ut
+                    period = getattr(v.orbit, 'period', None)
+                    an_ut, dn_ut = _find_next_nodes(v.orbit, ref, h2, ut0, period)
+                    if an_ut:
+                        out["next_an_ut"] = an_ut
+                        out["time_to_an_s"] = an_ut - ut0
+                    if dn_ut:
+                        out["next_dn_ut"] = dn_ut
+                        out["time_to_dn_s"] = dn_ut - ut0
+            except Exception:
+                pass
+
+            try:
+                o = tb2.orbit
+                out["target_sma_m"] = getattr(o, "semi_major_axis", None)
+                out["target_period_s"] = getattr(o, "period", None)
+                out["target_inclination_deg"] = getattr(o, "inclination", None)
+                out["target_lan_deg"] = getattr(o, "longitude_of_ascending_node", None)
+            except Exception:
+                pass
+            return out
+    except Exception:
+        pass
+
+    out["target_type"] = None
+    return out
+
+
+def list_bodies(conn) -> List[Dict[str, Any]]:
+    sc = conn.space_center
+    out: List[Dict[str, Any]] = []
+    try:
+        bodies = getattr(sc, "bodies", {}) or {}
+        for name, b in bodies.items():
+            item = {
+                "name": name,
+                "parent": getattr(getattr(getattr(b, "orbit", None), "reference_body", None), "name", None),
+                "has_atmosphere": bool(getattr(b, "atmosphere", getattr(b, "has_atmosphere", False))),
+                "radius_m": getattr(b, "equatorial_radius", None),
+                "soi_radius_m": getattr(b, "sphere_of_influence", None),
+            }
+            out.append(item)
+    except Exception:
+        pass
+    return out
+
+
+def list_vessels(conn) -> List[Dict[str, Any]]:
+    sc = conn.space_center
+    v = sc.active_vessel
+    out: List[Dict[str, Any]] = []
+    cb = None
+    ref = None
+    vp = None
+    try:
+        cb = v.orbit.body
+        ref = getattr(cb, "non_rotating_reference_frame", cb.reference_frame)
+        vp = v.position(ref)
+    except Exception:
+        ref = None
+        vp = None
+    try:
+        for ov in sc.vessels:
+            item = {
+                "name": ov.name,
+                "type": _enum_name(getattr(ov, "type", None)),
+                "situation": _enum_name(getattr(ov, "situation", None)),
+            }
+            if ref is not None and vp is not None:
+                try:
+                    tp = ov.position(ref)
+                    dp = [tp[i] - vp[i] for i in range(3)]
+                    item["distance_m"] = sqrt(dp[0] ** 2 + dp[1] ** 2 + dp[2] ** 2)
+                except Exception:
+                    pass
+            if ov.id == v.id:
+                item["self"] = True
+                item.setdefault("distance_m", 0.0)
+            out.append(item)
+    except Exception:
+        pass
+    # Sort by distance if available
+    try:
+        out.sort(key=lambda x: (x.get("distance_m") is None, x.get("distance_m", 0)))
     except Exception:
         pass
     return out
