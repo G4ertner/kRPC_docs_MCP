@@ -38,7 +38,24 @@ Quick start
 
 3) Try local search (optional sanity check)
 - uv --directory krpc-docs run scripts/search_krpc_index.py "autopilot" --k 5
-- uv --directory krpc-docs run scripts/search_krpc_index.py "getting started" --k 5
+ - uv --directory krpc-docs run scripts/search_krpc_index.py "getting started" --k 5
+
+Connect to kRPC (game) — settings and code
+- In KSP (other PC), open the kRPC window → Edit:
+  - Protocol: Protobuf over TCP (for Python client)
+  - Address: the PC’s LAN IP (not localhost) or set Manual and enter it
+  - RPC port: leave default (commonly 50000) or set a free TCP port
+  - Stream port: leave default (commonly 50001) or set a free TCP port
+  - Advanced → Auto-accept new clients: optional ON (avoids confirmation prompts)
+  - Ensure the OS firewall allows inbound TCP on both ports
+- From this machine, Python example:
+  ```py
+  import krpc
+  conn = krpc.connect(name='My Program', address='192.168.1.10', rpc_port=50000, stream_port=50001)
+  print(conn.krpc.get_status().version)
+  ```
+- Helper function (provided): `mcp_server/krpc/client.py:connect_to_game(address, rpc_port=50000, stream_port=50001, name=None, timeout=5.0)`
+  - Lazy-imports `krpc` and raises a helpful `KRPCConnectionError` on failures
 
 Run the MCP server (uv)
 - As a module (recommended):
@@ -50,6 +67,9 @@ Using with Codex CLI
 - Add the server (stdio transport) so Codex can launch it as needed:
   - codex mcp add krpc_docs -- uv --directory "$HOME/krpc-docs" run -m mcp_server.main
   - or use the console script: codex mcp add krpc_docs -- uv --directory "$HOME/krpc-docs" run krpc-mcp
+  - To enable kRPC tools automatically, include extras: `--with krpc`:
+    - codex mcp remove krpc_docs
+    - codex mcp add krpc_docs -- uv --with krpc --directory "$HOME/krpc-docs" run -m mcp_server.main
 
 KSP Wiki tools (English)
 - The server also exposes live KSP Wiki tools powered by the MediaWiki API:
@@ -69,6 +89,9 @@ KSP Wiki tools (English)
 
 Notes on environments
 - uv automatically resolves and caches dependencies declared in `pyproject.toml`.
+- kRPC tools are optional. Install support with extras when needed:
+  - uv --directory krpc-docs run --with krpc -m mcp_server.main
+  - or: uv pip install -e ".[krpc]"
 - You can create a dedicated venv explicitly if you prefer:
   - cd krpc-docs
   - uv venv --python 3.10

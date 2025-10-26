@@ -24,6 +24,9 @@ scrape = [
   "tqdm>=4.66.5",
   "requests-cache>=1.2.1",
 ]
+krpc = [
+  "krpc>=0.5.4",
+]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
