@@ -87,6 +87,74 @@ KSP Wiki tools (English)
   - search_krpc_docs: `Use krpc_docs to search_krpc_docs for 'autopilot'`
   - get_krpc_doc: `Use krpc_docs to get_krpc_doc with url 'https://krpc.github.io/krpc/python/client.html'`
 
+Script execution pipeline (execute_script)
+- Tool: `krpc_docs.execute_script`
+- Purpose: Run short, deterministic Python scripts against the live game with the kRPC connection auto-injected. The pipeline captures everything printed/logged and returns it to the agent, along with a parsed summary and error info.
+
+Injected globals in your script
+- `conn`: kRPC connection
+- `vessel`: active vessel or `None` (guard for scenes without a vessel)
+- `time`, `math`: standard modules
+- `sleep(s)`, `deadline`, `check_time()`: timeout helpers; call `check_time()` inside loops
+- `logging`, `log(msg)`: logging is preconfigured and captured
+
+Contract and best practices
+- Do not import kRPC or connect manually. The runner handles it.
+- Use `print()` and/or the `logging` module; both appear in the transcript.
+- Use bounded loops and call `check_time()`; the runner enforces a hard wall-time timeout.
+- End with a `SUMMARY:` block (single-line or multi-line starting with `SUMMARY:`) so the agent can quickly understand outcomes.
+- `pause_on_end` is best-effort. It may be unavailable depending on client/server versions.
+
+Call from CLI (local sanity check)
+- Hello/log/summary example:
+  - `uv run scripts/krpc_execute_script_cli.py --address 192.168.2.28 --code "print('hello'); logging.info('note'); print('SUMMARY: ok')"`
+  - Returns JSON: `{ ok, summary, transcript, stdout, stderr, error, paused, timing, code_stats }`
+
+Call from MCP (in chat)
+- `Use krpc_docs to execute_script with code "print('hello'); print('SUMMARY: done')" and address '192.168.2.28'`
+
+Example script (gravity turn step)
+```
+# (No imports or kRPC connect – runner injects conn, vessel, logging, etc.)
+logging.info("Starting gravity turn ascent step")
+
+if vessel is None:
+    print("SUMMARY: aborted — no active vessel in scene")
+else:
+    flight = vessel.flight()
+    logging.info(f"STATE: Ap={vessel.orbit.apoapsis_altitude:.0f} m")
+
+    vessel.control.throttle = 1.0
+    logging.info("Throttle set to 100%")
+
+    t0 = conn.space_center.ut
+    while flight.mean_altitude < 10000 and conn.space_center.ut - t0 < 120:
+        check_time()
+        alt = flight.mean_altitude
+        vs = flight.vertical_speed
+        logging.info(f"STATE: alt={alt:.0f} vs={vs:.1f}")
+        if alt > 3000: vessel.control.pitch = 80
+        if alt > 7000: vessel.control.pitch = 60
+        sleep(0.5)
+
+    print("""SUMMARY:
+phase: initial gravity turn
+achieved: yes
+altitude_m: {:.1f}
+next_step: begin horizontal acceleration to build orbital velocity
+""".format(flight.mean_altitude))
+```
+
+Return fields
+- `ok`: True/False
+- `summary`: Parsed from the stdout portion beginning with `SUMMARY:` (if present)
+- `transcript`: Combined stdout + stderr so exceptions are visible alongside prints/logs
+- `stdout`, `stderr`: Raw channels
+- `error`: Parsed exception info (type/message/line) when available
+- `paused`: True/False/None (best-effort)
+- `timing.exec_time_s`: Wall time in seconds
+- `code_stats`: `{ line_count, has_imports }`
+
 Notes on environments
 - uv automatically resolves and caches dependencies declared in `pyproject.toml`.
 - kRPC tools are optional. Install support with extras when needed:
