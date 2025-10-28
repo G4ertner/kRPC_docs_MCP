@@ -174,5 +174,34 @@ Each line is a page object:
   "title": "Page Title",
   "headings": ["Section 1", "Section 2"],
   "anchors": ["section-1", "section-2"],
-  "content_text": "Cleaned text..."
+"content_text": "Cleaned text..."
 }
+
+Vessel blueprint tools
+- Tools:
+  - `get_vessel_blueprint(address, ...)` → JSON blueprint (meta, stages, engines, parts)
+  - `get_part_tree(address, ...)` → JSON parts[] with parent/children, stage, modules, resources
+  - `get_blueprint_ascii(address, ...)` → Human-readable per-stage summary
+- Resource cache: `resource://blueprints/latest` (call `get_vessel_blueprint` first)
+- Export diagrams:
+  - `export_blueprint_diagram(address, format='svg'|'png'|'both', out_dir=?)` → saves to `artifacts/blueprints/` by default
+  - Resources after export:
+    - `resource://blueprints/last-diagram.svg` — SVG (text)
+    - `resource://blueprints/last-diagram.png` — JSON with base64 PNG payload ({mime, data_base64})
+- CLI sanity check:
+  - `uv run scripts/krpc_blueprint_cli.py --address 192.168.2.28`
+  - or use MCP: `Use krpc_docs to get_vessel_blueprint with address '192.168.2.28'`, then fetch `resource://blueprints/latest`
+
+Blueprint usage playbook
+- Resource: `resource://playbooks/vessel-blueprint-usage`
+- Describes how agents should read blueprint fields and plan safe staging/burns.
+
+Export quick test
+- SVG only:
+  - `Use krpc_docs to export_blueprint_diagram with address '192.168.2.28' and format 'svg'`
+  - Then fetch `resource://blueprints/last-diagram.svg`
+  - Or open the saved file in `artifacts/blueprints/`.
+- PNG (requires Pillow):
+  - `uv pip install pillow`
+  - `Use krpc_docs to export_blueprint_diagram with address '192.168.2.28' and format 'png'`
+  - Then fetch `resource://blueprints/last-diagram.png` (base64 JSON), or open the saved PNG path from the tool output.

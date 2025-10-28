@@ -1928,3 +1928,294 @@ def propose_ejection_node_to_body(conn, target_body_name: str, parking_alt_m: fl
         "parking_alt_m": parking_alt_m,
         "notes": "Coarse ejection estimate. Refine ejection angle and add small normal/radial as needed.",
     }
+
+
+# --- Vessel blueprint and part tree ---
+
+def part_tree(conn) -> Dict[str, Any]:
+    """
+    Return a hierarchical part tree with staging and module/resource summaries.
+
+    Shape: { parts: [ { id, title, name, tag?, stage, decouple_stage?, parent_id?, children_ids[],
+                        modules: [...], resources: {R:{amount,max}}, crossfeed? } ] }
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    parts_list = []
+    try:
+        all_parts = list(v.parts.all)
+    except Exception:
+        all_parts = []
+
+    # Index parts
+    id_map: Dict[int, int] = {}
+    for i, p in enumerate(all_parts):
+        id_map[id(p)] = i
+
+    # For robustness across kRPC versions, detect module presence per-part by probing attributes
+    def _detect_modules(p):
+        labels = []
+        for label, attr in (
+            ('Engine', 'engine'),
+            ('Decoupler', 'decoupler'),
+            ('Separator', 'separator'),
+            ('Parachute', 'parachute'),
+            ('DockingPort', 'docking_port'),
+            ('ReactionWheel', 'reaction_wheel'),
+            ('RCS', 'rcs'),
+            ('SolarPanel', 'solar_panel'),
+            ('Antenna', 'antenna'),
+            ('Command', 'command_module'),
+        ):
+            try:
+                if getattr(p, attr, None) is not None:
+                    labels.append(label)
+            except Exception:
+                continue
+        return labels
+
+    # Assemble part entries
+    for i, p in enumerate(all_parts):
+        parent_id = None
+        try:
+            pr = getattr(p, 'parent', None)
+            if pr is not None:
+                parent_id = id_map.get(id(pr))
+        except Exception:
+            parent_id = None
+        children_ids = []
+        try:
+            for ch in getattr(p, 'children', []) or []:
+                pid = id_map.get(id(ch))
+                if pid is not None:
+                    children_ids.append(pid)
+        except Exception:
+            children_ids = []
+
+        # Resources per part
+        res_map: Dict[str, Any] = {}
+        try:
+            pres = getattr(p, 'resources', None)
+            names = list(getattr(pres, 'names', []) or [])
+            for rn in names:
+                try:
+                    res_map[rn] = {
+                        'amount': pres.amount(rn),
+                        'max': pres.max(rn),
+                    }
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        entry = {
+            'id': i,
+            'title': getattr(p, 'title', None),
+            'name': getattr(p, 'name', None),
+            'tag': getattr(p, 'tag', None),
+            'stage': getattr(p, 'stage', None),
+            'decouple_stage': getattr(p, 'decouple_stage', None),
+            'parent_id': parent_id,
+            'children_ids': children_ids,
+            'modules': _detect_modules(p),
+            'resources': res_map,
+            'crossfeed': getattr(p, 'crossfeed', None),
+        }
+        parts_list.append(entry)
+
+    return {'parts': parts_list}
+
+
+def vessel_blueprint(conn) -> Dict[str, Any]:
+    """
+    Return an idealized vessel blueprint with stages, engines, controls, and a part tree.
+
+    Sections:
+      - meta: name, mass_kg, current_stage, total_stages, body, situation
+      - stages: from stage_plan_approx (current environment)
+      - engines: basic engine specs keyed by part id
+      - control_capabilities: counts of relevant systems
+      - parts: from part_tree()
+    """
+    sc = conn.space_center
+    v = sc.active_vessel
+    meta = {
+        'vessel_name': getattr(v, 'name', None),
+        'mass_kg': getattr(v, 'mass', None),
+        'current_stage': getattr(getattr(v, 'control', None), 'current_stage', None),
+        'total_stages': None,
+        'body': getattr(getattr(v, 'orbit', None), 'body', None).name if getattr(getattr(v, 'orbit', None), 'body', None) is not None else None,
+        'situation': _enum_name(getattr(v, 'situation', None)),
+    }
+
+    # Part tree
+    tree = part_tree(conn)
+    parts = tree.get('parts', [])
+
+    # Engines list with simple specs
+    engines = []
+    id_map = {}
+    try:
+        # Build id map again for Module to Part linkage
+        all_parts = list(v.parts.all)
+        id_map = {id(p): i for i, p in enumerate(all_parts)}
+    except Exception:
+        pass
+    try:
+        for e in getattr(v.parts, 'engines', []) or []:
+            try:
+                p = getattr(e, 'part', None)
+                pid = id_map.get(id(p)) if p is not None else None
+            except Exception:
+                pid = None
+            engines.append({
+                'part_id': pid,
+                'name': getattr(getattr(e, 'part', None), 'title', None),
+                'max_thrust_n': getattr(e, 'max_thrust', None),
+                'specific_impulse_s': getattr(e, 'specific_impulse', None),
+                'throttle': getattr(e, 'throttle', None),
+            })
+    except Exception:
+        pass
+
+    # Control capabilities
+    def _count(attr):
+        try:
+            return len(list(getattr(v.parts, attr)))
+        except Exception:
+            return None
+    control_caps = {
+        'command_modules': _count('command_modules'),
+        'reaction_wheels': _count('reaction_wheels'),
+        'rcs': _count('rcs'),
+        'docking_ports': _count('docking_ports'),
+        'parachutes': _count('parachutes'),
+        'antennas': _count('antennas'),
+        'solar_panels': _count('solar_panels'),
+    }
+
+    # Stage plan approximation
+    stage_plan = None
+    try:
+        stage_plan = stage_plan_approx(conn, environment='current')
+        stages = stage_plan.get('stages', []) if isinstance(stage_plan, dict) else None
+        if stages:
+            # Estimate total stages as count of segments in plan
+            meta['total_stages'] = len(stages)
+    except Exception:
+        stages = None
+
+    # Best-effort geometry: thrust axis from engine part directions (vessel frame)
+    thrust_axis = None
+    try:
+        ref = getattr(v, 'reference_frame')
+        dirs = []
+        for e in getattr(v.parts, 'engines', []) or []:
+            try:
+                p = getattr(e, 'part', None)
+                if p is None:
+                    continue
+                d = p.direction(ref)
+                if isinstance(d, (list, tuple)) and len(d) == 3:
+                    dirs.append([float(d[0]), float(d[1]), float(d[2])])
+            except Exception:
+                continue
+        if dirs:
+            sx = sum(d[0] for d in dirs); sy = sum(d[1] for d in dirs); sz = sum(d[2] for d in dirs)
+            n = (sx**2 + sy**2 + sz**2) ** 0.5
+            if n > 0:
+                thrust_axis = [sx / n, sy / n, sz / n]
+    except Exception:
+        thrust_axis = None
+
+    # Annotate parts with vessel-frame position and axial coordinate if thrust axis is known
+    try:
+        ref = getattr(v, 'reference_frame')
+        for p in parts:
+            try:
+                # Retrieve original part object to compute position
+                # We need mapping id->part again
+                pass
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    blueprint = {
+        'meta': meta,
+        'stages': stages,
+        'engines': engines,
+        'control_capabilities': control_caps,
+        'parts': parts,
+        'geometry': {
+            'thrust_axis_vessel': thrust_axis,
+            'center_of_mass_vessel': None,
+        },
+        'notes': [
+            'This is a best-effort blueprint derived from kRPC; some fields may be null when unavailable.',
+            'Use stages + parts.stage/decouple_stage to reason about staging order.',
+        ],
+    }
+    return blueprint
+
+
+def blueprint_ascii(conn) -> str:
+    """
+    Produce a compact ASCII summary using fast queries only:
+    - Header: name, body, situation, mass
+    - Per-stage rows from stage_plan_approx (engines/dv/TWR)
+    - Dec/Par/Dock counts via dedicated part groups (no full part scan)
+    """
+    v = conn.space_center.active_vessel
+    meta = {
+        'vessel_name': getattr(v, 'name', None),
+        'body': getattr(getattr(v, 'orbit', None), 'body', None).name if getattr(getattr(v, 'orbit', None), 'body', None) is not None else None,
+        'situation': _enum_name(getattr(v, 'situation', None)),
+        'mass_kg': getattr(v, 'mass', None),
+    }
+    sp = stage_plan_approx(conn, environment='current')
+    stages = sp.get('stages', []) if isinstance(sp, dict) else []
+
+    # Build fast counts from part groups
+    from collections import defaultdict
+    by_stage = defaultdict(lambda: {'dec':0,'par':0,'dock':0})
+
+    def stage_of(obj):
+        p = getattr(obj, 'part', None) or obj
+        s = getattr(p, 'stage', None)
+        if s is None or (isinstance(s, int) and s < 0):
+            s = getattr(p, 'decouple_stage', None)
+        return s
+
+    try:
+        for d in list(getattr(v.parts, 'decouplers', []) or []) + list(getattr(v.parts, 'separators', []) or []):
+            by_stage[stage_of(d)]['dec'] += 1
+    except Exception:
+        pass
+    try:
+        for c in list(getattr(v.parts, 'parachutes', []) or []):
+            by_stage[stage_of(c)]['par'] += 1
+    except Exception:
+        pass
+    try:
+        for dp in list(getattr(v.parts, 'docking_ports', []) or []):
+            by_stage[stage_of(dp)]['dock'] += 1
+    except Exception:
+        pass
+
+    lines = []
+    lines.append(f"Vessel: {meta.get('vessel_name')} | Body: {meta.get('body')} | Situation: {meta.get('situation')} | Mass: {meta.get('mass_kg')}")
+    lines.append("")
+    if not stages:
+        lines.append("(No stage plan available)")
+    else:
+        lines.append("Stage | Engines | Δv (m/s) | TWR | Dec/Par/Dock")
+        lines.append("----- | ------- | --------- | ---- | ------------")
+        for seg in sorted(stages, key=lambda x: x.get('stage', 0), reverse=True):
+            s = seg.get('stage')
+            eng = int(seg.get('engines') or 0)
+            dv = seg.get('delta_v_m_s')
+            twr = seg.get('twr_surface')
+            c = by_stage.get(s, {'dec':0,'par':0,'dock':0})
+            lines.append(f"{s:>5} | {eng:>7} | {dv if dv is not None else '-':>9} | {twr if twr is not None else '-':>4} | {c['dec']}/{c['par']}/{c['dock']}")
+    return "\n".join(lines)

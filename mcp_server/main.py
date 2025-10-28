@@ -4,6 +4,8 @@ from . import resources  # noqa: F401 - register playbook resources
 from . import prompts    # noqa: F401 - register master prompt
 from .krpc import tools as krpc_tools  # noqa: F401 - register kRPC tools
 from . import executor_tools  # noqa: F401 - register execute_script tool
+from . import blueprint_cache  # noqa: F401 - register blueprint resource
+from . import blueprint_export  # noqa: F401 - register export tool
 from .server import mcp
 
 

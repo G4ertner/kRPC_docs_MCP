@@ -20,3 +20,30 @@ PLAYBOOK_TEXT = (
 def get_maneuver_node_playbook() -> str:
     return PLAYBOOK_TEXT
 
+
+BLUEPRINT_USAGE = (
+    "Vessel Blueprint Usage\n\n"
+    "Purpose: Provide the agent with a structural understanding of the current vessel to plan safe, effective scripts.\n\n"
+    "Recommended Calls:\n"
+    "- get_status_overview — confirm scene, body, situation\n"
+    "- get_vessel_blueprint — meta, stages (dv/TWR), engines, parts\n"
+    "- get_blueprint_ascii — quick human-readable summary (by stage)\n\n"
+    "Key Fields:\n"
+    "- meta.current_stage — current stage index\n"
+    "- stages[] — per-engine-stage Δv/TWR (approximate)\n"
+    "- parts[].stage / parts[].decouple_stage — staging order and drop points\n"
+    "- engines[] — engine locations (part_id), thrust/Isp\n\n"
+    "Checklist Before Staging/Burn:\n"
+    "1) Confirm next stage has engines and sufficient propellant (parts with LiquidFuel/Oxidizer/MonoPropellant/SolidFuel).\n"
+    "2) Verify TWR > 1 if performing a surface/ascent burn.\n"
+    "3) Ensure control capabilities: SAS/Reaction Wheels, RCS if required.\n"
+    "4) After staging, refresh blueprint to update structure and dv/TWR.\n\n"
+    "Notes:\n"
+    "- Stage plan is an approximation; values differ from KSP UI. Use as planning guidance.\n"
+    "- Geometry is best-effort; thrust axis and CoM may be unavailable.\n"
+)
+
+
+@mcp.resource("resource://playbooks/vessel-blueprint-usage")
+def get_blueprint_usage_playbook() -> str:
+    return BLUEPRINT_USAGE

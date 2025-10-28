@@ -803,3 +803,56 @@ def clear_target(address: str, rpc_port: int = 50000, stream_port: int = 50001, 
     except Exception:
         pass
     return "Cleared target." if cleared else "No target to clear."
+
+
+# --- Vessel blueprint tools ---
+
+@mcp.tool()
+def get_part_tree(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Hierarchical part tree with staging and module/resource summaries.
+
+    Returns:
+      JSON: { parts: [ { id, title, name, tag?, stage, decouple_stage?, parent_id?, children_ids[],
+              modules: [...], resources: {R:{amount,max}}, crossfeed? } ] }
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    return json.dumps(readers.part_tree(conn))
+
+
+@mcp.tool()
+def get_vessel_blueprint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Idealized vessel blueprint combining meta, stage plan, engines, control capabilities, and part tree.
+
+    When to use:
+      - Give the agent a structural understanding of the craft before writing scripts.
+
+    Returns:
+      JSON with sections: meta, stages, engines, control_capabilities, parts, geometry, notes.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    bp = readers.vessel_blueprint(conn)
+    try:
+        # Cache for blueprint resource
+        from ..blueprint_cache import set_latest_blueprint
+        set_latest_blueprint(bp)
+    except Exception:
+        pass
+    return json.dumps(bp)
+
+
+@mcp.tool()
+def get_blueprint_ascii(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Compact ASCII schematic/summary of the current vessel by stage.
+
+    Includes a header and a per-stage table with engine counts, Δv, TWR,
+    and key part category counts (Eng/Tank/Dec/Par/Dock).
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    try:
+        s = readers.blueprint_ascii(conn)
+        return s
+    except Exception as e:
+        return f"Failed to build ASCII blueprint: {e}"
