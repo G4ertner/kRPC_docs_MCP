@@ -26,6 +26,7 @@ def execute_script(
     *,
     timeout_sec: float = 120.0,
     pause_on_end: bool = True,
+    unpause_on_start: bool = True,
     allow_imports: bool = False,
 ) -> str:
     """
@@ -45,7 +46,8 @@ def execute_script(
       code: Python source string to execute
       address/rpc_port/stream_port/name: kRPC connection settings
       timeout_sec: Max wall time for the script (seconds)
-      pause_on_end: Attempt to pause KSP via SpaceCenter when finished (best-effort; may be None)
+      unpause_on_start: Best-effort unpause on start to ensure simulation runs
+      pause_on_end: Attempt to pause KSP when finished (best-effort; may be None)
       allow_imports: Permit `import` statements inside the script (default false)
 
     Returns:
@@ -79,6 +81,7 @@ def execute_script(
             "timeout_sec": float(timeout_sec),
             "allow_imports": bool(allow_imports),
             "pause_on_end": bool(pause_on_end),
+            "unpause_on_start": bool(unpause_on_start),
         }
 
         # Spawn runner in a separate Python subprocess to isolate execution
@@ -153,6 +156,7 @@ def execute_script(
             "stderr": err or "",
             "error": error_obj,
             "paused": (meta.get("paused") if isinstance(meta, dict) else None),
+            "unpaused": (meta.get("unpaused") if isinstance(meta, dict) else None),
             "timing": {"exec_time_s": (meta.get("exec_time_s") if isinstance(meta, dict) else None)},
             "code_stats": {
                 "line_count": code.count("\n") + 1,

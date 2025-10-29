@@ -13,6 +13,13 @@ from .parsers import EXEC_META_PREFIX
 
 
 def _try_pause(conn) -> bool | None:
+    # Preferred API: KRPC.paused (read/write)
+    try:
+        conn.krpc.paused = True
+        return True
+    except Exception:
+        pass
+    # Fallbacks: SpaceCenter variants across versions
     try:
         sc = conn.space_center
     except Exception:
@@ -30,6 +37,37 @@ def _try_pause(conn) -> bool | None:
         try:
             if hasattr(sc, attr):
                 setattr(sc, attr, True)
+                return True
+        except Exception:
+            continue
+    return None
+
+
+def _try_unpause(conn) -> bool | None:
+    """Best-effort attempt to unpause the game (equivalent to closing pause menu)."""
+    # Preferred API: KRPC.paused (read/write)
+    try:
+        conn.krpc.paused = False
+        return True
+    except Exception:
+        pass
+    # Fallbacks: SpaceCenter variants across versions
+    try:
+        sc = conn.space_center
+    except Exception:
+        return None
+    for attr in ("set_pause", "set_paused", "pause"):
+        try:
+            fn = getattr(sc, attr, None)
+            if callable(fn):
+                fn(False)
+                return True
+        except Exception:
+            continue
+    for attr in ("paused", "is_paused"):
+        try:
+            if hasattr(sc, attr):
+                setattr(sc, attr, False)
                 return True
         except Exception:
             continue
@@ -57,22 +95,38 @@ def main() -> None:
     timeout_sec = float(cfg.get("timeout_sec", 120.0))
     allow_imports = bool(cfg.get("allow_imports", False))
     pause_on_end = bool(cfg.get("pause_on_end", True))
+    unpause_on_start = bool(cfg.get("unpause_on_start", True))
 
     exec_start = _time.monotonic()
     paused: bool | None = None
+    unpaused: bool | None = None
 
     try:
-        conn = connect_to_game(address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=min(timeout_sec, 10.0))
+        conn = connect_to_game(
+            address,
+            rpc_port=rpc_port,
+            stream_port=stream_port,
+            name=name,
+            timeout=min(timeout_sec, 10.0),
+        )
     except Exception:
         # Print traceback to stderr for parent to parse
         traceback.print_exc()
         meta = {
             "ok": False,
             "paused": None,
+            "unpaused": None,
             "exec_time_s": _time.monotonic() - exec_start,
         }
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
         sys.exit(1)
+
+    # Best-effort: ensure the game is running before the user code executes
+    if unpause_on_start:
+        try:
+            unpaused = _try_unpause(conn)
+        except Exception:
+            unpaused = None
 
     try:
         glb, cleanup = build_globals(conn, timeout_sec=timeout_sec, allow_imports=allow_imports)
@@ -81,6 +135,7 @@ def main() -> None:
         meta = {
             "ok": False,
             "paused": None,
+            "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
@@ -93,6 +148,7 @@ def main() -> None:
         meta = {
             "ok": False,
             "paused": None,
+            "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
@@ -100,18 +156,23 @@ def main() -> None:
 
     try:
         exec(compile(code, "<user_code>", "exec"), glb, glb)
-        if pause_on_end:
-            paused = _try_pause(conn)
         ok = True
     except Exception:
         traceback.print_exc()
         ok = False
     finally:
+        # Always attempt to pause after the script concludes, regardless of success
+        if pause_on_end:
+            try:
+                paused = _try_pause(conn)
+            except Exception:
+                paused = None
         restore_after_exec(cleanup)
 
     meta = {
         "ok": ok,
         "paused": paused,
+        "unpaused": unpaused,
         "exec_time_s": _time.monotonic() - exec_start,
     }
     print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")

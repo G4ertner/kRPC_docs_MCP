@@ -13,10 +13,7 @@ from .blueprint_cache import set_latest_blueprint
 from .server import mcp
 
 
-def _make_svg(bp: Dict[str, Any]) -> str:
-    meta = bp.get("meta", {})
-    stages = bp.get("stages") or []
-
+def _make_svg_fast(meta: Dict[str, Any], stages: List[Dict[str, Any]], counts_by_stage: Dict[Any, Dict[str, int]]) -> str:
     # Layout constants
     width = 900
     header_h = 60
@@ -37,50 +34,15 @@ def _make_svg(bp: Dict[str, Any]) -> str:
     svg.append(f"<text x='{pad}' y='{pad+46}' fill='#9fb3c8' font-family='monospace' font-size='12'>Stage | Engines | Δv (m/s) | TWR | Eng/Tank/Dec/Par/Dock</text>")
 
     y = header_h
-    # Build per-stage part counts from parts[]
-    from collections import defaultdict
-    parts = bp.get("parts") or []
-    by_stage = defaultdict(list)
-    for p in parts:
-        s = p.get('stage')
-        if s is None or s < 0:
-            s = p.get('decouple_stage')
-        by_stage[s].append(p)
-
-    def has_resource_tank(p):
-        res = p.get('resources') or {}
-        return any(r in res and (res[r] or {}).get('max', 0) > 0 for r in ('LiquidFuel','Oxidizer','MonoPropellant','SolidFuel'))
-
-    def is_decoupler(p):
-        mods = p.get('modules') or []
-        if 'Decoupler' in mods or 'Separator' in mods:
-            return True
-        t = (p.get('title') or '') + ' ' + (p.get('name') or '')
-        return ('Decoupler' in t) or ('Separator' in t) or ('radialDecoupler' in t)
-
-    def is_parachute(p):
-        mods = p.get('modules') or []
-        if 'Parachute' in mods:
-            return True
-        t = (p.get('title') or '') + ' ' + (p.get('name') or '')
-        return ('Parachute' in t)
-
-    def is_docking_port(p):
-        mods = p.get('modules') or []
-        if 'DockingPort' in mods:
-            return True
-        t = (p.get('title') or '') + ' ' + (p.get('name') or '')
-        return ('Dock' in t) or ('docking' in t.lower())
-
     row_idx = 0
     for seg in sorted(stages, key=lambda x: x.get('stage', 0), reverse=True) or [{"stage": "-", "engines": 0}]:
         s = seg.get('stage')
-        sparts = by_stage.get(s, [])
+        c = counts_by_stage.get(s, {"tank":0,"dec":0,"par":0,"dock":0})
         eng = int(seg.get('engines') or 0)
-        tank = sum(1 for p in sparts if has_resource_tank(p))
-        dec = sum(1 for p in sparts if is_decoupler(p))
-        par = sum(1 for p in sparts if is_parachute(p))
-        dock = sum(1 for p in sparts if is_docking_port(p))
+        tank = int(c.get('tank', 0))
+        dec = int(c.get('dec', 0))
+        par = int(c.get('par', 0))
+        dock = int(c.get('dock', 0))
         dv = seg.get('delta_v_m_s')
         twr = seg.get('twr_surface')
 
@@ -94,13 +56,11 @@ def _make_svg(bp: Dict[str, Any]) -> str:
     return "".join(svg)
 
 
-def _try_png(bp: Dict[str, Any], out_path: Path) -> bool:
+def _try_png_fast(meta: Dict[str, Any], stages: List[Dict[str, Any]], counts_by_stage: Dict[Any, Dict[str, int]], out_path: Path) -> bool:
     try:
         from PIL import Image, ImageDraw, ImageFont
     except Exception:
         return False
-    meta = bp.get("meta", {})
-    stages = bp.get("stages") or []
     width = 1000
     header_h = 80
     row_h = 52
@@ -119,33 +79,15 @@ def _try_png(bp: Dict[str, Any], out_path: Path) -> bool:
     d.text((pad, pad), title, fill=(234,238,242), font=font_b)
     d.text((pad, pad+24), "Stage | Engines | Δv (m/s) | TWR | Eng/Tank/Dec/Par/Dock", fill=(159,179,200), font=font)
 
-    # Part counts
-    from collections import defaultdict
-    parts = bp.get("parts") or []
-    by_stage = defaultdict(list)
-    for p in parts:
-        s = p.get('stage')
-        if s is None or s < 0:
-            s = p.get('decouple_stage')
-        by_stage[s].append(p)
-
-    def count_mod(stage_parts, label):
-        c = 0
-        for p in stage_parts:
-            mods = p.get("modules") or []
-            if label in mods:
-                c += 1
-        return c
-
     y = header_h
     for idx, seg in enumerate(sorted(stages, key=lambda x: x.get('stage', 0), reverse=True) or [{"stage": "-", "engines": 0}]):
         s = seg.get('stage')
-        sparts = by_stage.get(s, [])
+        c = counts_by_stage.get(s, {"tank":0,"dec":0,"par":0,"dock":0})
         eng = int(seg.get('engines') or 0)
-        tank = sum(1 for p in sparts if has_resource_tank(p))
-        dec = sum(1 for p in sparts if is_decoupler(p))
-        par = sum(1 for p in sparts if is_parachute(p))
-        dock = sum(1 for p in sparts if is_docking_port(p))
+        tank = int(c.get('tank', 0))
+        dec = int(c.get('dec', 0))
+        par = int(c.get('par', 0))
+        dock = int(c.get('dock', 0))
         dv = seg.get('delta_v_m_s')
         twr = seg.get('twr_surface')
 
@@ -184,8 +126,53 @@ def export_blueprint_diagram(
       JSON: { uri_svg?, uri_png?, saved_path_svg?, saved_path_png?, note? }
     """
     conn = connect_to_game(address, rpc_port=rpc_port, stream_port=stream_port, name=name)
-    bp = readers.vessel_blueprint(conn)
-    set_latest_blueprint(bp)
+    v = conn.space_center.active_vessel
+    # Fast meta
+    meta = {
+        'vessel_name': getattr(v, 'name', None),
+        'body': getattr(getattr(v, 'orbit', None), 'body', None).name if getattr(getattr(v, 'orbit', None), 'body', None) is not None else None,
+        'situation': getattr(getattr(v, 'situation', None), 'name', None) if hasattr(getattr(v, 'situation', None), 'name') else str(getattr(v, 'situation', None)),
+        'mass_kg': getattr(v, 'mass', None),
+    }
+    # Stage plan (fast)
+    stage_plan = readers.stage_plan_approx(conn, environment='current')
+    stages = stage_plan.get('stages', []) if isinstance(stage_plan, dict) else []
+    # Fast per-stage counts
+    from collections import defaultdict
+    counts_by_stage: Dict[Any, Dict[str,int]] = defaultdict(lambda: {'tank':0,'dec':0,'par':0,'dock':0})
+    def stage_of(obj):
+        p = getattr(obj, 'part', None) or obj
+        s = getattr(p, 'stage', None)
+        if s is None or (isinstance(s,int) and s<0):
+            s = getattr(p, 'decouple_stage', None)
+        return s
+    try:
+        for d in list(getattr(v.parts,'decouplers',[]) or []) + list(getattr(v.parts,'separators',[]) or []):
+            counts_by_stage[stage_of(d)]['dec'] += 1
+    except Exception:
+        pass
+    try:
+        for c in list(getattr(v.parts,'parachutes',[]) or []):
+            counts_by_stage[stage_of(c)]['par'] += 1
+    except Exception:
+        pass
+    try:
+        for dp in list(getattr(v.parts,'docking_ports',[]) or []):
+            counts_by_stage[stage_of(dp)]['dock'] += 1
+    except Exception:
+        pass
+    try:
+        for p in list(getattr(v.parts,'all',[]) or []):
+            names = set(getattr(getattr(p,'resources',None),'names',[]) or [])
+            if {'LiquidFuel','Oxidizer','MonoPropellant','SolidFuel'} & names:
+                counts_by_stage[stage_of(p)]['tank'] += 1
+    except Exception:
+        pass
+    # Update cached blueprint minimally
+    try:
+        set_latest_blueprint({'meta': meta, 'stages': stages})
+    except Exception:
+        pass
 
     ts = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     base = Path(out_dir or (Path.cwd() / "artifacts" / "blueprints"))
@@ -193,7 +180,7 @@ def export_blueprint_diagram(
     stem = f"blueprint_{ts}"
 
     # SVG always
-    svg_text = _make_svg(bp)
+    svg_text = _make_svg_fast(meta, stages, counts_by_stage)
     svg_path = base / f"{stem}.svg"
     svg_path.write_text(svg_text, encoding="utf-8")
 
@@ -209,7 +196,7 @@ def export_blueprint_diagram(
     fmt = (format or "svg").lower()
     if fmt in ("png", "both"):
         png_path = base / f"{stem}.png"
-        ok = _try_png(bp, png_path)
+        ok = _try_png_fast(meta, stages, counts_by_stage, png_path)
         if ok:
             # Store minimal pointer; resource will serve if available
             with png_path.open("rb") as f:

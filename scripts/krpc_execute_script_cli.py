@@ -17,6 +17,7 @@ def main() -> None:
     p.add_argument("--name", default=None)
     p.add_argument("--timeout", type=float, default=120.0)
     p.add_argument("--no-pause", action="store_true")
+    p.add_argument("--no-unpause-start", action="store_true")
     p.add_argument("--allow-imports", action="store_true")
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--code", help="Inline code string")
@@ -36,6 +37,7 @@ def main() -> None:
         name=args.name,
         timeout_sec=args.timeout,
         pause_on_end=not args.no_pause,
+        unpause_on_start=not args.no_unpause_start,
         allow_imports=args.allow_imports,
     )
     print(out)
@@ -43,4 +45,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
