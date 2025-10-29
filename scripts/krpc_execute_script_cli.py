@@ -15,7 +15,8 @@ def main() -> None:
     p.add_argument("--rpc-port", type=int, default=50000)
     p.add_argument("--stream-port", type=int, default=50001)
     p.add_argument("--name", default=None)
-    p.add_argument("--timeout", type=float, default=120.0)
+    p.add_argument("--timeout", type=float, default=0.0, help="Soft deadline (s); 0 disables")
+    p.add_argument("--hard-timeout", type=float, default=0.0, help="Hard kill timeout (s); 0 disables")
     p.add_argument("--no-pause", action="store_true")
     p.add_argument("--no-unpause-start", action="store_true")
     p.add_argument("--allow-imports", action="store_true")
@@ -35,10 +36,11 @@ def main() -> None:
         rpc_port=args.rpc_port,
         stream_port=args.stream_port,
         name=args.name,
-        timeout_sec=args.timeout,
+        timeout_sec=(None if args.timeout <= 0 else args.timeout),
         pause_on_end=not args.no_pause,
         unpause_on_start=not args.no_unpause_start,
         allow_imports=args.allow_imports,
+        hard_timeout_sec=(None if args.hard_timeout <= 0 else args.hard_timeout),
     )
     print(out)
 

@@ -8,7 +8,7 @@ import math as _math
 from typing import Any, Dict, Tuple
 
 
-def build_globals(conn, *, timeout_sec: float, allow_imports: bool) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def build_globals(conn, *, timeout_sec: float | None, allow_imports: bool) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Build the global namespace for exec() with helpful utilities and safety controls.
 
@@ -17,9 +17,12 @@ def build_globals(conn, *, timeout_sec: float, allow_imports: bool) -> Tuple[Dic
 
     Returns (globals_dict, cleanup_state) so the runner can restore import hooks.
     """
-    # Timeout helpers
+    # Timeout helpers (soft deadline): if timeout_sec is None/<=0, disable deadline
     start = _time.monotonic()
-    deadline = start + max(0.1, float(timeout_sec))
+    if timeout_sec is None or float(timeout_sec) <= 0:
+        deadline = float("inf")
+    else:
+        deadline = start + max(0.1, float(timeout_sec))
 
     def check_time():
         if _time.monotonic() > deadline:
@@ -78,6 +81,104 @@ def build_globals(conn, *, timeout_sec: float, allow_imports: bool) -> Tuple[Dic
             )
 
         builtins.__import__ = _restricted_import  # type: ignore
+
+    # Convenience helpers for common mission steps (staging, thrust checks, liftoff)
+    def _sum_thrust(v) -> float:
+        try:
+            engines = getattr(getattr(v, "parts", None), "engines", []) or []
+            return float(sum((getattr(e, "thrust", 0.0) or 0.0) for e in engines))
+        except Exception:
+            return 0.0
+
+    def _has_launch_clamps(v) -> bool | None:
+        try:
+            clamps = getattr(getattr(v, "parts", None), "launch_clamps", None)
+            if clamps is None:
+                return None
+            return len(list(clamps)) > 0
+        except Exception:
+            return None
+
+    def _release_clamps_and_stage(ctrl, *, max_stages: int = 10) -> bool | None:
+        """Stage until no launch clamps remain (best-effort). Returns True if clamps cleared."""
+        cleared: bool | None = None
+        for _ in range(max_stages):
+            try:
+                hc = _has_launch_clamps(g.get("vessel"))
+                if hc is False:
+                    cleared = True
+                    break
+                ctrl.activate_next_stage()
+            except Exception:
+                pass
+            # give KSP a moment to update staging
+            try:
+                sleep(0.2)
+            except Exception:
+                pass
+        if cleared is None:
+            # Could not determine presence of clamps
+            return None
+        return cleared
+
+    def _stage_until_thrust(ctrl, *, max_stages: int = 10, thrust_threshold_n: float = 1.0) -> bool:
+        """Stage up to N times until total thrust exceeds threshold. Returns True if thrust detected."""
+        for _ in range(max_stages):
+            try:
+                ctrl.activate_next_stage()
+            except Exception:
+                pass
+            t0 = _time.monotonic()
+            while _time.monotonic() - t0 < 1.0:
+                try:
+                    check_time()
+                except Exception:
+                    # If no soft deadline, continue
+                    pass
+                if _sum_thrust(g.get("vessel")) > float(thrust_threshold_n):
+                    return True
+                try:
+                    sleep(0.1)
+                except Exception:
+                    pass
+        return False
+
+    def _wait_for_liftoff(v, *, vs_threshold: float = 0.5, timeout_s: float = 20.0) -> bool:
+        """Wait until vertical speed exceeds threshold or situation changes from pre_launch."""
+        t0 = _time.monotonic()
+        while _time.monotonic() - t0 < float(timeout_s):
+            try:
+                check_time()
+            except Exception:
+                pass
+            try:
+                fl = v.flight()
+                vs = float(getattr(fl, "vertical_speed", 0.0) or 0.0)
+                if vs > float(vs_threshold):
+                    return True
+            except Exception:
+                pass
+            try:
+                sleep(0.25)
+            except Exception:
+                pass
+        return False
+
+    def _situation_name(v) -> str | None:
+        try:
+            sit = getattr(v, "situation", None)
+            return str(sit) if sit is not None else None
+        except Exception:
+            return None
+
+    g["helpers"] = {
+        "sum_thrust": _sum_thrust,
+        "has_launch_clamps": _has_launch_clamps,
+        "release_clamps": _release_clamps_and_stage,
+        "stage_until_thrust": _stage_until_thrust,
+        "wait_for_liftoff": _wait_for_liftoff,
+        "situation": _situation_name,
+    }
 
     return g, cleanup
 

@@ -24,10 +24,11 @@ def execute_script(
     stream_port: int = 50001,
     name: str | None = None,
     *,
-    timeout_sec: float = 120.0,
+    timeout_sec: float | None = None,
     pause_on_end: bool = True,
     unpause_on_start: bool = True,
     allow_imports: bool = False,
+    hard_timeout_sec: float | None = None,
 ) -> str:
     """
     Execute a Python script against the running kRPC game with automatic connection and helpers.
@@ -45,10 +46,13 @@ def execute_script(
     Args:
       code: Python source string to execute
       address/rpc_port/stream_port/name: kRPC connection settings
-      timeout_sec: Max wall time for the script (seconds)
+      timeout_sec: Soft deadline (seconds) injected into the script via check_time().
+                  Use None/<=0 to disable the soft deadline.
       unpause_on_start: Best-effort unpause on start to ensure simulation runs
       pause_on_end: Attempt to pause KSP when finished (best-effort; may be None)
       allow_imports: Permit `import` statements inside the script (default false)
+      hard_timeout_sec: Parent watchdog (seconds). If set, the MCP process will kill the
+                        script runner after this time. None disables the hard timeout.
 
     Returns:
       JSON: {
@@ -78,7 +82,7 @@ def execute_script(
             "rpc_port": int(rpc_port),
             "stream_port": int(stream_port),
             "name": name,
-            "timeout_sec": float(timeout_sec),
+            "timeout_sec": (None if (timeout_sec is None or float(timeout_sec) <= 0) else float(timeout_sec)),
             "allow_imports": bool(allow_imports),
             "pause_on_end": bool(pause_on_end),
             "unpause_on_start": bool(unpause_on_start),
@@ -116,7 +120,11 @@ def execute_script(
             })
 
         try:
-            out, err = proc.communicate(timeout=float(timeout_sec))
+            if hard_timeout_sec is not None and float(hard_timeout_sec) > 0:
+                out, err = proc.communicate(timeout=float(hard_timeout_sec))
+            else:
+                # No hard timeout: wait until the runner exits
+                out, err = proc.communicate()
         except subprocess.TimeoutExpired:
             try:
                 proc.kill()
@@ -127,10 +135,10 @@ def execute_script(
                 "summary": None,
                 "transcript": "",  # interrupted
                 "stdout": "",
-                "stderr": "TimeoutExpired: script exceeded timeout budget",
-                "error": {"type": "TimeoutError", "message": "Script timed out"},
+                "stderr": "TimeoutExpired: hard timeout reached; process killed",
+                "error": {"type": "TimeoutError", "message": "Hard timeout reached"},
                 "paused": None,
-                "timing": {"exec_time_s": float(timeout_sec)},
+                "timing": {"exec_time_s": (float(hard_timeout_sec) if hard_timeout_sec else None)},
                 "code_stats": {
                     "line_count": code.count("\n") + 1,
                     "has_imports": bool(re.search(r"^\s*(from|import)\b", code, re.M)),

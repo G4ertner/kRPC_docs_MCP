@@ -12,10 +12,19 @@ from .injectors import build_globals, restore_after_exec
 from .parsers import EXEC_META_PREFIX
 
 
+def _get_paused(conn) -> bool | None:
+    try:
+        return bool(conn.krpc.paused)
+    except Exception:
+        return None
+
+
 def _try_pause(conn) -> bool | None:
     # Preferred API: KRPC.paused (read/write)
     try:
-        conn.krpc.paused = True
+        current = bool(conn.krpc.paused)
+        if not current:
+            conn.krpc.paused = True
         return True
     except Exception:
         pass
@@ -45,9 +54,10 @@ def _try_pause(conn) -> bool | None:
 
 def _try_unpause(conn) -> bool | None:
     """Best-effort attempt to unpause the game (equivalent to closing pause menu)."""
-    # Preferred API: KRPC.paused (read/write)
+    # Preferred API: KRPC.paused (read/write) — only write when currently paused
     try:
-        conn.krpc.paused = False
+        if bool(conn.krpc.paused):
+            conn.krpc.paused = False
         return True
     except Exception:
         pass
@@ -74,6 +84,18 @@ def _try_unpause(conn) -> bool | None:
     return None
 
 
+def _is_prelaunch(vessel) -> bool | None:
+    try:
+        sit = getattr(vessel, "situation", None)
+        if sit is None:
+            return None
+        name = getattr(sit, "name", None)
+        text = (name or str(sit) or "").lower()
+        return ("pre_launch" in text) or ("prelaunch" in text)
+    except Exception:
+        return None
+
+
 def _load_config() -> Dict[str, Any]:
     cfg_env = sys.argv[1] if len(sys.argv) > 1 else None
     if not cfg_env:
@@ -92,7 +114,8 @@ def main() -> None:
     rpc_port = int(cfg.get("rpc_port", 50000))
     stream_port = int(cfg.get("stream_port", 50001))
     name = cfg.get("name")
-    timeout_sec = float(cfg.get("timeout_sec", 120.0))
+    _raw_timeout = cfg.get("timeout_sec", None)
+    timeout_sec = None if _raw_timeout in (None, "", 0, 0.0) else float(_raw_timeout)
     allow_imports = bool(cfg.get("allow_imports", False))
     pause_on_end = bool(cfg.get("pause_on_end", True))
     unpause_on_start = bool(cfg.get("unpause_on_start", True))
@@ -100,6 +123,7 @@ def main() -> None:
     exec_start = _time.monotonic()
     paused: bool | None = None
     unpaused: bool | None = None
+    initial_prelaunch: bool | None = None
 
     try:
         conn = connect_to_game(
@@ -107,7 +131,7 @@ def main() -> None:
             rpc_port=rpc_port,
             stream_port=stream_port,
             name=name,
-            timeout=min(timeout_sec, 10.0),
+            timeout=(min(timeout_sec, 10.0) if isinstance(timeout_sec, (int, float)) and timeout_sec > 0 else 10.0),
         )
     except Exception:
         # Print traceback to stderr for parent to parse
@@ -118,8 +142,20 @@ def main() -> None:
             "unpaused": None,
             "exec_time_s": _time.monotonic() - exec_start,
         }
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
         sys.exit(1)
+
+    # Capture initial state
+    try:
+        v0 = getattr(conn.space_center, "active_vessel", None)
+        initial_prelaunch = _is_prelaunch(v0)
+    except Exception:
+        initial_prelaunch = None
 
     # Best-effort: ensure the game is running before the user code executes
     if unpause_on_start:
@@ -138,6 +174,11 @@ def main() -> None:
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
         sys.exit(1)
 
@@ -151,6 +192,11 @@ def main() -> None:
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
         sys.exit(1)
 
@@ -161,13 +207,29 @@ def main() -> None:
         traceback.print_exc()
         ok = False
     finally:
-        # Always attempt to pause after the script concludes, regardless of success
-        if pause_on_end:
+        # Decide if we should pause at the end. If the vessel remained in pre-launch
+        # throughout, skip pausing to avoid popping the pause menu before liftoff.
+        should_pause = bool(pause_on_end)
+        if should_pause:
+            try:
+                v1 = getattr(conn.space_center, "active_vessel", None)
+                if initial_prelaunch is True and _is_prelaunch(v1) is True:
+                    should_pause = False
+            except Exception:
+                pass
+        if should_pause:
             try:
                 paused = _try_pause(conn)
             except Exception:
                 paused = None
         restore_after_exec(cleanup)
+
+    # Ensure logs flush before emitting final meta line
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:
+        pass
 
     meta = {
         "ok": ok,
