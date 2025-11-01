@@ -171,10 +171,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/extract_snippets.py` — supports single file or full repo extraction, sets default license fields, toggles to include/exclude kinds, optional schema validation, outputs JSONL.
 - Auto: Sanity on sample file yields 4 records (function, class, method, const). Records validated prior to write; JSONL round-trip via store CLI succeeds.
 
-**B5. Dependency analysis**
-- Deliverables: `src/ingest/deps.py` building per‑snippet `dependencies[]` via static calls, qualified names, and cross‑file map.
-- Auto: Unit tests on sample code that calls helpers across files; validates resolution.
-- Manual: Visual check on 1–2 complex scripts; confirm helper linkage.
+**B5. Dependency analysis (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/deps.py` — builds repo-wide symbol index (`module.func`, `module.Class.method`), analyzes per-function/method call sites using imports/aliases and attribute resolution, and resolves repo-local dependencies.
+  - CLI: `krpc-snippets/scripts/deps_analyze_repo.py` — enriches existing or freshly extracted snippets with `dependencies[]`.
+- Auto: Synthetic multi-file example verifies `a.main2.calls` depends on `pkg.util.helper`; class/method handling and non-local calls ignored.
 
 **B6. Licence detector**
 - Deliverables: `src/governance/license.py` (SPDX detection from LICENSE file + GitHub API fallback + file headers). Flags GPL‑family.

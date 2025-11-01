@@ -78,3 +78,12 @@ Step B4 — Snippet extraction
   - Single file: `uv --directory . run python krpc-snippets/scripts/extract_snippets.py --root <repo> --file a/sample.py --out krpc-snippets/data/snippets.jsonl --license MIT --license-url https://opensource.org/licenses/MIT --validate`
   - Whole repo: `uv --directory . run python krpc-snippets/scripts/extract_snippets.py --root <repo> --all --out krpc-snippets/data/snippets.jsonl`
   - Output JSONL is ready for store adapters; validate with `scripts/schema_validate.py`
+
+Step B5 — Dependency analysis (static)
+- Module: `krpc_snippets/ingest/deps.py`
+  - Builds a repo-wide symbol index (module.func, module.Class.method)
+  - Analyzes call sites per function/method and resolves repo-local dependencies via imports/aliases
+  - Attaches `dependencies[]` to snippet records (fully qualified names)
+- CLI: `krpc-snippets/scripts/deps_analyze_repo.py`
+  - Enrich existing JSONL: `uv --directory . run python krpc-snippets/scripts/deps_analyze_repo.py --root <repo> --snippets <snippets.jsonl> --out <snippets_with_deps.jsonl> --validate`
+  - Or extract then enrich: `uv --directory . run python krpc-snippets/scripts/deps_analyze_repo.py --root <repo> --extract --out <snippets_with_deps.jsonl>`
