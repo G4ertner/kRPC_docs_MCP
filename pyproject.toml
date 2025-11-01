@@ -28,6 +28,10 @@ scrape = [
 krpc = [
   "krpc>=0.5.4",
 ]
+enrich = [
+  "openai>=1.30.0",
+  "tenacity>=8.2.3",
+]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

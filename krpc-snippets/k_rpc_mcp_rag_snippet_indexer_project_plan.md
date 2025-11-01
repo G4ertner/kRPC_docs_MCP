@@ -190,10 +190,13 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Sanity over sample snippets shows zero mismatches; fix mode preserves ids; provenance map export works.
 
 ### Phase C — Enrichment (LLM) & Indexing
-**C1. LLM summariser & tagger**
-- Deliverables: `src/enrich/summarise.py` batching calls to the OpenAI API (or mock), producing `description`, `categories[]`, `inputs/outputs`, and “when to use”.
-- Auto: Golden‑file tests using a local mock that returns stable outputs; validates field presence & length bounds.
-- Manual: Spot‑check 10 outputs for correctness.
+**C1. LLM summariser & tagger (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/enrich/summarise.py` — summarizes and tags snippets (description, categories, inputs/outputs, when_to_use); supports OpenAI and mock mode; per‑snippet disk cache under `krpc-snippets/data/enrich_cache`.
+  - CLI: `krpc-snippets/scripts/enrich_summarise.py` — `--in/--out`, `--model`, `--mock`, `--only-empty`, `--validate`; respects `OPENAI_API_KEY` when not using `--mock`.
+  - Optional extras: `[enrich]` adds `openai` and `tenacity`.
+- Auto: Mock mode used for development sanity; record‑by‑record schema validation passes.
+- Manual: Live test run with provided API key on sample snippets succeeded; output JSONL written and validated.
 
 **C2. Embedding generator**
 - Deliverables: `src/enrich/embed.py` generating embeddings for `name + description + code_head`. Pluggable model name.

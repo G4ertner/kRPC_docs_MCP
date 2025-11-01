@@ -107,3 +107,14 @@ Step B7 — Provenance recorder & auditor
   - Audit: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl>`
   - Fix: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl> --fix --out <out.jsonl> [--repair-id] [--validate]`
   - Export map: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl> --provenance-map --out <map.jsonl>`
+
+Phase C — Enrichment & Indexing
+
+Step C1 — LLM summariser & tagger
+- Module: `krpc_snippets/enrich/summarise.py`
+  - Summarises snippet description, refines categories, and adds inputs/outputs/when_to_use
+  - Uses OpenAI when `OPENAI_API_KEY` is set; otherwise mock mode; caches per-snippet results under `krpc-snippets/data/enrich_cache`
+- CLI: `krpc-snippets/scripts/enrich_summarise.py`
+  - `uv --directory . run python krpc-snippets/scripts/enrich_summarise.py --in <snippets.jsonl> --out <snippets_enriched.jsonl> --only-empty --validate`
+  - Add `--mock` to force mock mode; set `--model` to choose model (default `gpt-4o-mini`)
+  - Ensure `OPENAI_API_KEY` in environment (unquoted) when not using `--mock`
