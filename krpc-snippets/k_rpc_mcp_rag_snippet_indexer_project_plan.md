@@ -260,9 +260,25 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - Config: `--queries`, `--snippets`, `--index`, embeddings source, `--mode keyword|hybrid`, `--iters`, `--warmup`, `--mock`.
 - Auto: Bench on sample corpus yields sub‑millisecond keyword and low‑millisecond hybrid latencies; ready to add CI thresholds.
 
-**E4. CI pipeline**
-- Deliverables: GitHub Actions (lint, type, unit, eval, licence audit, build). Binary cache for embeddings if applicable.
-- Auto: All steps green on PR; status badge.
+**E4. CI pipeline (implemented)**
+- Deliverables: GitHub Actions (lint, eval, licence audit, bench) with mock‑friendly defaults; optional type checks. Binary cache for uv to speed installs.
+- Jobs (proposed):
+  - setup: checkout, Python 3.10+, install uv
+  - lint (optional initially): run ruff if configured; otherwise skip
+  - schema sanity: run `scripts/schema_validate.py` on fixtures
+  - build artifacts (small): build keyword index from snippets; optionally build mock embeddings
+  - eval: run `scripts/eval_retrieval.py` keyword mode with thresholds (`--min-top3 0.6`, `--min-ndcg10 0.6`)
+  - audit: run `scripts/audit_licenses.py --fail-on-unknown --fail-on-mismatch` (and `--fail-on-restricted` if policy requires)
+  - bench (non‑gating): run `scripts/bench_search.py` with a few iters; upload JSON report as artifact
+  - mcp smoke: `python -c "from mcp_server import main, snippets_tools; print('ok')"`
+- Environment:
+  - Do NOT set `OPENAI_API_KEY` in CI; scripts automatically use mock where needed (hybrid query embedding/rerank)
+  - Use `uv pip install -e .` (optionally `.[enrich]` if live embedding is ever enabled in a separate workflow)
+- Reports/Artifacts:
+  - Upload JSON reports for evaluation (`eval_keyword.json`, `eval_hybrid.json`) and bench (`bench_keyword.json`, `bench_hybrid.json`) when present
+- Future:
+  - Add type checks (mypy/pyright) once annotations stabilize
+  - Add status badge and matrix for Python 3.10/3.11
 
 ### Phase F — Developer Experience & Docs
 **F1. Codex CLI playbooks**

@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Create venv and install
+        run: |
+          uv venv
+          . .venv/bin/activate
+          uv pip install -e .
+
+      - name: Schema sanity (fixtures)
+        run: |
+          . .venv/bin/activate
+          uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_valid.json
+          # Invalid fixture is expected to fail; ignore non-zero
+          uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json || true
+
+      - name: Build keyword index (if missing)
+        run: |
+          . .venv/bin/activate
+          SN=krpc-snippets/data/snippets_enriched.jsonl
+          [ -f "$SN" ] || SN=krpc-snippets/data/snippets_extracted.jsonl
+          IDX=krpc-snippets/data/keyword_index.json
+          if [ ! -f "$IDX" ]; then
+            uv --directory . run python krpc-snippets/scripts/search_keyword.py build --in "$SN" --out "$IDX"
+          fi
+
+      - name: Eval (keyword)
+        run: |
+          . .venv/bin/activate
+          uv --directory . run python krpc-snippets/scripts/eval_retrieval.py \
+            --queries krpc-snippets/eval/queries.jsonl \
+            --snippets krpc-snippets/data/snippets_enriched.jsonl \
+            --index krpc-snippets/data/keyword_index.json \
+            --mode keyword --k 10 --min-top3 0.6 --min-ndcg10 0.6 \
+            --report krpc-snippets/data/eval_keyword.json
+
+      - name: License audit
+        run: |
+          . .venv/bin/activate
+          uv --directory . run python krpc-snippets/scripts/audit_licenses.py \
+            --snippets krpc-snippets/data/snippets_enriched.jsonl \
+            --fail-on-unknown --fail-on-mismatch \
+            --report krpc-snippets/data/license_audit.ci.json
+
+      - name: Bench (non-gating)
+        run: |
+          . .venv/bin/activate
+          uv --directory . run python krpc-snippets/scripts/bench_search.py \
+            --queries krpc-snippets/eval/queries.jsonl \
+            --snippets krpc-snippets/data/snippets_enriched.jsonl \
+            --index krpc-snippets/data/keyword_index.json \
+            --mode keyword --iters 25 --warmup 5 --k 5 \
+            --report krpc-snippets/data/bench_keyword.json || true
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            krpc-snippets/data/eval_keyword.json
+            krpc-snippets/data/license_audit.ci.json
+            krpc-snippets/data/bench_keyword.json
+
+      - name: MCP server import smoke
+        run: |
+          . .venv/bin/activate
+          python - << 'PY'
+import importlib
+import sys
+try:
+    import mcp_server.main  # noqa: F401
+    import mcp_server.snippets_tools  # noqa: F401
+    print('ok')
+except Exception as e:
+    print('MCP import failed:', e)
+    sys.exit(1)
+PY
