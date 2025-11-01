@@ -84,11 +84,47 @@ def build_globals(conn, *, timeout_sec: float | None, allow_imports: bool) -> Tu
 
     # Convenience helpers for common mission steps (staging, thrust checks, liftoff)
     def _sum_thrust(v) -> float:
+        """Best-effort total current/available thrust (N) across engines or vessel.
+
+        Tries, in order:
+        - vessel.available_thrust
+        - sum(engine.available_thrust)
+        - sum(engine.thrust)
+        - sum(engine.max_thrust * engine.throttle) as a last resort
+        """
+        try:
+            vt = getattr(v, "available_thrust", None)
+            if isinstance(vt, (int, float)) and vt > 0:
+                return float(vt)
+        except Exception:
+            pass
+
+        total = 0.0
         try:
             engines = getattr(getattr(v, "parts", None), "engines", []) or []
-            return float(sum((getattr(e, "thrust", 0.0) or 0.0) for e in engines))
+            for e in engines:
+                val = None
+                for attr in ("available_thrust", "thrust"):
+                    try:
+                        t = getattr(e, attr, None)
+                        if isinstance(t, (int, float)) and t > 0:
+                            val = float(t)
+                            break
+                    except Exception:
+                        continue
+                if val is None:
+                    # Heuristic: approximate from max_thrust * engine throttle
+                    try:
+                        mt = getattr(e, "max_thrust", 0.0) or 0.0
+                        ethr = getattr(e, "throttle", None)
+                        if isinstance(ethr, (int, float)) and mt > 0:
+                            val = float(mt) * float(ethr)
+                    except Exception:
+                        pass
+                total += float(val or 0.0)
         except Exception:
-            return 0.0
+            pass
+        return float(total)
 
     def _has_launch_clamps(v) -> bool | None:
         try:
@@ -143,8 +179,19 @@ def build_globals(conn, *, timeout_sec: float | None, allow_imports: bool) -> Tu
                     pass
         return False
 
-    def _wait_for_liftoff(v, *, vs_threshold: float = 0.5, timeout_s: float = 20.0) -> bool:
-        """Wait until vertical speed exceeds threshold or situation changes from pre_launch."""
+    def _wait_for_liftoff(v, *, vs_threshold: float = 0.5, timeout_s: float = 20.0, alt_delta_m: float = 3.0) -> bool:
+        """Wait for liftoff using multiple signals:
+        - vertical_speed > vs_threshold
+        - situation != pre_launch
+        - altitude increases by > alt_delta_m from baseline
+        """
+        # Baseline altitude
+        try:
+            fl0 = v.flight()
+            base_alt = float(getattr(fl0, "mean_altitude", getattr(fl0, "surface_altitude", 0.0)) or 0.0)
+        except Exception:
+            base_alt = 0.0
+
         t0 = _time.monotonic()
         while _time.monotonic() - t0 < float(timeout_s):
             try:
@@ -152,9 +199,20 @@ def build_globals(conn, *, timeout_sec: float | None, allow_imports: bool) -> Tu
             except Exception:
                 pass
             try:
+                # Situation check
+                sit = getattr(v, "situation", None)
+                sit_text = (getattr(sit, "name", None) or str(sit) or "").lower()
+                if sit_text and ("pre_launch" not in sit_text and "prelaunch" not in sit_text):
+                    return True
+            except Exception:
+                pass
+            try:
                 fl = v.flight()
                 vs = float(getattr(fl, "vertical_speed", 0.0) or 0.0)
+                alt = float(getattr(fl, "mean_altitude", getattr(fl, "surface_altitude", base_alt)) or base_alt)
                 if vs > float(vs_threshold):
+                    return True
+                if (alt - base_alt) > float(alt_delta_m):
                     return True
             except Exception:
                 pass
