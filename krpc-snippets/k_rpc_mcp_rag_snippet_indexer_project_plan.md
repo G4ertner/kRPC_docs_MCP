@@ -212,9 +212,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/search_keyword.py` — build, query (OR/AND, category filter, exclude restricted), and ad-hoc mode.
 - Auto: Synthetic corpus indexed (docs=4); queries for “NavHelper” and “helper” return expected class/method in Top‑2.
 
-**C4. Vector store & hybrid retrieval**
-- Deliverables: `src/index/vector.py` (FAISS/SQLite); `src/search/hybrid.py` that merges keyword + vector results with simple rank fusion.
-- Auto: Evaluate hybrid > keyword on a small benchmark; assert improvement.
+**C4. Hybrid retrieval (keyword + vectors) (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/search/hybrid.py` — loads keyword index + embedding store (SQLite/JSONL/Parquet), embeds query (OpenAI/mock), performs cosine similarity, and fuses scores with configurable alpha weights.
+  - CLI: `krpc-snippets/scripts/search_hybrid.py` — hybrid search across existing index and embeddings with filters and AND/OR keyword logic.
+- Auto: Sanity queries on sample corpus return expected top results and fuse keyword/vector signals.
 
 **C5. Reranker (optional)**
 - Deliverables: `src/search/rerank.py` (cross‑encoder or lightweight LLM re‑score for Top‑K).

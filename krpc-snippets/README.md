@@ -136,3 +136,9 @@ Step C3 — Keyword index (inverted)
   - Build: `uv --directory . run python krpc-snippets/scripts/search_keyword.py build --in krpc-snippets/data/snippets_enriched.jsonl --out krpc-snippets/data/keyword_index.json`
   - Query: `uv --directory . run python krpc-snippets/scripts/search_keyword.py query --index krpc-snippets/data/keyword_index.json --query "NavHelper" --k 5`
   - Ad-hoc: `uv --directory . run python krpc-snippets/scripts/search_keyword.py adhoc --in krpc-snippets/data/snippets_enriched.jsonl --query "helper" --k 5`
+
+Step C4 — Hybrid retrieval (keyword + vectors)
+- Module: `krpc_snippets/search/hybrid.py`
+  - Loads keyword index + embedding store; embeds query text (OpenAI or mock); cos-sim vector search; fuses scores (alpha weights)
+- CLI: `krpc-snippets/scripts/search_hybrid.py`
+  - Example: `uv --directory . run python krpc-snippets/scripts/search_hybrid.py --query "NavHelper" --index krpc-snippets/data/keyword_index.json --embeddings-jsonl krpc-snippets/data/embeddings.jsonl --k 5 --alpha-keyword 0.5 --alpha-vector 0.5 --mock`
