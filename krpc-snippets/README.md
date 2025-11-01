@@ -149,3 +149,13 @@ Step C5 — Reranker (optional)
   - Final score = beta_rerank * rerank_score + (1 - beta_rerank) * hybrid_fused
 - CLI (extended): `krpc-snippets/scripts/search_hybrid.py`
   - `--rerank --beta-rerank 0.7 --top-m 20 --rerank-model gpt-4o-mini` (add `--mock-rerank` for offline)
+
+Phase D — Serving & Resolution
+
+Step D1 — Dependency-aware resolver
+- Module: `krpc_snippets/resolve/resolve_snippet.py`
+  - Resolves a target snippet to a paste-ready bundle including dependencies, with size caps and unresolved reporting
+  - Methods emit their parent class code; const blocks for involved modules are emitted first
+- CLI: `krpc-snippets/scripts/resolve_snippet.py`
+  - By id: `uv --directory . run python krpc-snippets/scripts/resolve_snippet.py --snippets krpc-snippets/data/snippets_extracted.jsonl --id <snippet_id> --out krpc-snippets/data/bundle.py`
+  - By name: `uv --directory . run python krpc-snippets/scripts/resolve_snippet.py --snippets krpc-snippets/data/snippets_extracted.jsonl --name a.sample.NavHelper.circ_dv --out krpc-snippets/data/bundle_navhelper.py`

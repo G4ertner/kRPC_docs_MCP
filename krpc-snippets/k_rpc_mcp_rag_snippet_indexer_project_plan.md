@@ -225,9 +225,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Mock rerank integrates and adjusts final ordering on sample queries; live rerank verified with API key.
 
 ### Phase D — Serving & Resolution
-**D1. Dependency‑aware resolver**
-- Deliverables: `src/resolve/resolve_snippet.py` that, given a snippet id, returns snippet + required helpers (bounded by size), with a topological order for paste‑ability.
-- Auto: Graph tests on cross‑file fixtures; prevents cycles; respects size cap.
+**D1. Dependency‑aware resolver (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/resolve/resolve_snippet.py` — resolves a target snippet to a paste‑ready bundle including dependencies; emits const blocks first; methods emit their parent class; DAG traversal with cycle guard; size caps by nodes/bytes; reports unresolved symbols.
+  - CLI: `krpc-snippets/scripts/resolve_snippet.py` — resolve by `--id` or `--name module.qualname`, with output path and caps.
+- Auto: Sanity on sample corpus — method target emits parent class + consts; function target emits consts + function; bundle markers and deterministic order verified.
 
 **D2. MCP tools**
 - Deliverables: `src/mcp/tools.py` exposing `search_snippets(query)`, `get_snippet(id)`, `resolve_snippet(id)`, `search_and_resolve(query)`.
