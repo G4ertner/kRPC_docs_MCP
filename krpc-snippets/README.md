@@ -22,7 +22,7 @@ Layout
 - `data/` — placeholder for datasets (JSONL/Parquet/SQLite) generated later
 - `artifacts/` — placeholder for exports and benchmarks
 - `ci/` — placeholder for CI docs/config
- - `scripts/` — helper scripts (e.g., schema validation)
+- `scripts/` — helper scripts (e.g., schema validation)
 
 Step A2 — Snippet JSON schema
 - Schema file: `krpc_snippets/schemas/snippet.schema.json`
@@ -31,3 +31,16 @@ Step A2 — Snippet JSON schema
   - `uv pip install jsonschema`
   - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_valid.json`
   - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json` (should report errors and exit non‑zero)
+
+Step A3 — Storage adapters (JSONL, Parquet, SQLite)
+- Modules:
+  - JSONL: `krpc_snippets/store/jsonl.py` → `write_jsonl`, `iter_jsonl`
+  - Parquet: `krpc_snippets/store/parquet.py` → `write_parquet`, `read_parquet` (requires `pyarrow`)
+  - SQLite: `krpc_snippets/store/sqlite.py` → `open_db`, `init_schema`, `upsert_snippet`, `bulk_insert`, `get_by_id`, `iter_all`, `query`
+- CLI helper: `krpc-snippets/scripts/snippets_store_cli.py`
+  - JSONL → SQLite: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py jsonl-to-sqlite --in krpc-snippets/data/fixtures/snippet_valid.json --out krpc-snippets/data/snippets.sqlite`
+  - SQLite → JSONL: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py sqlite-to-jsonl --in krpc-snippets/data/snippets.sqlite --out krpc-snippets/data/snippets.jsonl`
+  - JSONL → Parquet: `uv pip install pyarrow && uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py jsonl-to-parquet --in krpc-snippets/data/snippets.jsonl --out krpc-snippets/data/snippets.parquet`
+  - Parquet → JSONL: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py parquet-to-jsonl --in krpc-snippets/data/snippets.parquet --out krpc-snippets/data/snippets2.jsonl`
+  - Count: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py count jsonl krpc-snippets/data/snippets.jsonl`
+  - Head: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py head sqlite krpc-snippets/data/snippets.sqlite --n 2`

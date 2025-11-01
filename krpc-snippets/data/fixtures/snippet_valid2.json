@@ -1,0 +1,17 @@
+{
+  "id": "9f7d19b6b6b64f2094ef0d78b7e46d62",
+  "repo": "https://github.com/example/krpc-sample",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "path": "src/landing.py",
+  "lang": "python",
+  "name": "Suicide burn estimate",
+  "description": "Compute burn start altitude using TWR and current mass.",
+  "code": "def estimate_suicide_burn_altitude(v, g, twr):\n    return v*v/(2*g*(twr-1))\n",
+  "categories": ["landing"],
+  "dependencies": [],
+  "license": "MIT",
+  "license_url": "https://opensource.org/licenses/MIT",
+  "created_at": "2025-01-01T00:00:00Z",
+  "restricted": false
+}
+

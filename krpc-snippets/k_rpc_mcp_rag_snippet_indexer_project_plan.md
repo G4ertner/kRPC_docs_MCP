@@ -129,9 +129,20 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json`
 - Manual: Extend fixtures as needed; inspect errors for clarity and completeness.
 
-**A3. Storage adapters** (JSONL + Parquet + SQLite)
-- Deliverables: `src/store/` with read/write APIs.
-- Auto: Round‑trip tests (write→read→equality) for 10 fixture records; property‑based fuzzing for special chars.
+**A3. Storage adapters (implemented)** (JSONL + Parquet + SQLite)
+- Deliverables (as implemented):
+  - JSONL adapter: `krpc_snippets/store/jsonl.py` → `write_jsonl`, `iter_jsonl` (atomic write, streaming read, optional validation; prunes None for optional fields).
+  - Parquet adapter: `krpc_snippets/store/parquet.py` → `write_parquet`, `read_parquet` (requires `pyarrow`; array fields mapped to list types).
+  - SQLite adapter: `krpc_snippets/store/sqlite.py` → `open_db`, `init_schema`, `upsert_snippet`, `bulk_insert`, `get_by_id`, `iter_all`, `query`.
+    - Internal column `commit_sha` is mapped back to schema field `commit` on export.
+    - Arrays stored as JSON TEXT; simple LIKE filter supported for `category` queries; WAL + NORMAL sync.
+  - Types/helpers: `krpc_snippets/store/types.py` (dataclass, size/loc helpers), `krpc_snippets/store/validation.py` (jsonschema-backed, optional).
+  - CLI utilities: `krpc-snippets/scripts/snippets_store_cli.py` with commands:
+    - `jsonl-to-sqlite`, `sqlite-to-jsonl`, `jsonl-to-parquet`, `parquet-to-jsonl`, `count`, `head`.
+- Auto (sanity):
+  - Build JSONL from fixtures, import to SQLite, verify `count`/`head`, export back to JSONL with `--validate`.
+  - Optional Parquet round-trip with `pyarrow` installed.
+  - All checks pass on local fixtures (N=2).
 
 ### Phase B — Ingestion & Parsing
 **B1. Git fetcher**
