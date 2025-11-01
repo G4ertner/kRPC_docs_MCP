@@ -30,12 +30,18 @@ Out of scope (initial): Code execution sandboxing, refactoring whole repos, code
 ---
 
 ## 3) Overview of Seed Repositories (non‑exhaustive)
-- **kRPC/krpc‑library** — Community examples for kRPC (general patterns, telemetry/control/streams).  https://github.com/krpc/krpc-library
-- **AlanCunningham/krpc‑scripts** — Launch to orbit, Mun transfer; gravity turn + circularisation utilities.  https://github.com/AlanCunningham/krpc-scripts
+- **kRPC/krpc‑library** — Community examples for kRPC (general patterns, telemetry/control/streams).  https://github.com/krpc/krpc-library  
+  LOADED: commit 4724ce…, snippets=154 (indexed; live embeddings)
+- **AlanCunningham/krpc‑scripts** — Launch to orbit, Mun transfer; gravity turn + circularisation utilities.  https://github.com/AlanCunningham/krpc-scripts  
+  LOADED: commit c1a363…, snippets=9 (indexed; live embeddings)
 - **alexlabbane/kRPC‑mun‑mission** — Full mission (LKO → Mun transfer/landing) with modular steps; reusable ascent/circularisation.  https://github.com/alexlabbane/kRPC-mun-mission
+  LOADED: commit b4d085…, snippets=15 (indexed; live embeddings)
 - **Jake1402/KSP‑PID‑Hovering** — PID‑based hover/landing control using kRPC flight data.  https://github.com/Jake1402/KSP-PID-Hovering
+  LOADED: commit 5accba…, snippets=27 (indexed; live embeddings)
 - **azolotarev/ksp‑with‑python** — Landing & suicide‑burn computations (burn start altitude, throttle control).  https://github.com/azolotarev/ksp-with-python
+  LOADED: commit de82f0…, snippets=10 (indexed; live embeddings)
 - **ndeutschmann‑fun/ksp‑ap** — Ascent autopilot modules, vis‑viva circularisation, suicide‑burn; modular architecture.  https://github.com/ndeutschmann-fun/ksp-ap
+  LOADED: commit 38f9a7…, snippets=0 (repository uses Python 2 style in key modules; extraction skipped)
 - **whatdamath/KerbalSpaceProgram** — Dynamic‑pressure‑limited ascent and circularisation node execution.  https://github.com/whatdamath/KerbalSpaceProgram
 - **BlackBreezeCastle/peg‑for‑krpc‑python** — Powered Explicit Guidance (PEG) for ascent guidance (pair with your control loop).  https://github.com/BlackBreezeCastle/peg-for-krpc-python
 - **pmauby/ksp‑autopilot** — Recoverable booster state machine: ascent, stage, flip, boost‑back, glide, land (PID).  https://github.com/pmauby/ksp-autopilot
