@@ -106,6 +106,13 @@ Step E1 — License auditor & policy
   - Fail gates: add `--fail-on-unknown`, `--fail-on-restricted`, or `--fail-on-mismatch`
 - Policy doc: `krpc-snippets/docs/license_policy.md`
 
+Step E2 — Benchmark & eval harness
+- Queries: `krpc-snippets/eval/queries.jsonl` (seed set)
+- Script: `krpc-snippets/scripts/eval_retrieval.py`
+  - Keyword: `uv --directory . run python krpc-snippets/scripts/eval_retrieval.py --queries krpc-snippets/eval/queries.jsonl --snippets krpc-snippets/data/snippets_enriched.jsonl --index krpc-snippets/data/keyword_index.json --mode keyword --k 10 --report krpc-snippets/data/eval_keyword.json`
+  - Hybrid: `uv --directory . run python krpc-snippets/scripts/eval_retrieval.py --queries krpc-snippets/eval/queries.jsonl --snippets krpc-snippets/data/snippets_enriched.jsonl --index krpc-snippets/data/keyword_index.json --embeddings-jsonl krpc-snippets/data/embeddings.jsonl --mode hybrid --k 10 --report krpc-snippets/data/eval_hybrid.json`
+  - Add `--rerank` to include reranking; use `--min-top3` / `--min-ndcg10` to set fail gates
+
 Step B7 — Provenance recorder & auditor
 - Module: `krpc_snippets/ingest/provenance.py`
   - Fills/normalizes `repo`, `commit`, and `path` (repo-relative POSIX), using `fetch.json` if present

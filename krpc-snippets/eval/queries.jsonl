@@ -1,0 +1,5 @@
+{"qid": "Q1", "text": "NavHelper", "expected_ids": ["4799d6c729a0228bd8ceca22b2016dce7eaf09543250b8c9857977932e0c4874", "73a7d9c0956fd1bd7aa1a4d5dc5e2e0653b770150b138c554c0db55ecd484624"], "category": "class"}
+{"qid": "Q2", "text": "helper", "expected_ids": ["4799d6c729a0228bd8ceca22b2016dce7eaf09543250b8c9857977932e0c4874", "73a7d9c0956fd1bd7aa1a4d5dc5e2e0653b770150b138c554c0db55ecd484624"], "category": "method"}
+{"qid": "Q3", "text": "vis viva", "expected_ids": ["baa765f6fa5cf350e91931f70cfdaf310c79f98757c17bf34f8bab1921bd807d"], "category": "function"}
+{"qid": "Q4", "text": "constants", "expected_ids": ["268bbed6b8e50a4489d4b65a39cccef031f17317bc4e2a4f66d9d7ecf2646992"], "category": "const"}
+{"qid": "Q5", "text": "circ dv", "expected_ids": ["73a7d9c0956fd1bd7aa1a4d5dc5e2e0653b770150b138c554c0db55ecd484624"], "category": "method"}
