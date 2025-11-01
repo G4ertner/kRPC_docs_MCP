@@ -44,3 +44,16 @@ Step A3 — Storage adapters (JSONL, Parquet, SQLite)
   - Parquet → JSONL: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py parquet-to-jsonl --in krpc-snippets/data/snippets.parquet --out krpc-snippets/data/snippets2.jsonl`
   - Count: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py count jsonl krpc-snippets/data/snippets.jsonl`
   - Head: `uv --directory . run python krpc-snippets/scripts/snippets_store_cli.py head sqlite krpc-snippets/data/snippets.sqlite --n 2`
+
+Step B1 — Git fetcher (clone/update + checkout)
+- Module: `krpc_snippets/ingest/git_fetch.py`
+  - `slugify_repo(url_or_path)` → deterministic per‑repo folder
+  - `clone_or_update(url_or_path, dest_root, shallow_depth=1)`
+  - `checkout(repo_path, branch=None, sha=None, shallow_depth=1)` → sets HEAD, returns commit
+  - `fetch_repo(url_or_path, out_root, branch=None, sha=None, depth=1)` → end‑to‑end helper
+  - Manifests: `write_manifest(...)` writes `fetch.json` per repo
+- CLI: `krpc-snippets/scripts/fetch_repo.py`
+  - Single repo: `uv --directory . run python krpc-snippets/scripts/fetch_repo.py --url /path/to/local/repo --out krpc-snippets/data/repos`
+  - Batch JSONL (lines like `{ "url": "...", "branch": "main", "sha": "..." }`):
+    - `uv --directory . run python krpc-snippets/scripts/fetch_repo.py --file repos.jsonl --out krpc-snippets/data/repos`
+  - Output: per‑repo folder at `krpc-snippets/data/repos/<slug>/` with `fetch.json`

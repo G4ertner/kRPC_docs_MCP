@@ -145,10 +145,13 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - All checks pass on local fixtures (N=2).
 
 ### Phase B — Ingestion & Parsing
-**B1. Git fetcher**
-- Deliverables: `scripts/fetch_repo.py` (shallow clone, cache, rate‑limit); supports repo URL/branch/SHA.
-- Auto: Mocks for network; ensures correct folder layout and SHA recorded.
-- Manual: Fetch two seed repos successfully.
+**B1. Git fetcher (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/git_fetch.py` — clone/update, checkout by branch/SHA, resolve HEAD, default branch, and write manifest (`write_manifest`).
+  - CLI: `krpc-snippets/scripts/fetch_repo.py` — single `--url` or batch `--file` (JSONL with `{url, branch?, sha?}`), options for `--depth` and `--out`.
+  - Output layout: `krpc-snippets/data/repos/<slug>/` with `fetch.json` containing `{ repo_url, branch, sha, resolved_commit, default_branch, dest_path, fetched_at }`.
+- Auto: Local offline test using a temporary git repo; verified resolved commit and manifest written.
+- Manual: Fetching multiple seed repos via JSONL batch; inspect manifests and working copies.
 
 **B2. File discovery & language detection**
 - Deliverables: `src/ingest/walk_repo.py` (filters to .py, optional globs, ignore vendored dirs).
