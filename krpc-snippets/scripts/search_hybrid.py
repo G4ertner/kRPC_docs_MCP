@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from krpc_snippets.index.keyword import KeywordIndex
+from krpc_snippets.utils.env import load_env_defaults
 from krpc_snippets.search.hybrid import (
     load_keyword_index,
     load_embeddings_jsonl,
@@ -17,6 +18,8 @@ from krpc_snippets.search.hybrid import (
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    # Load local environment defaults (e.g., OPENAI_API_KEY) if present
+    load_env_defaults()
     p = argparse.ArgumentParser(description="Hybrid search (keyword + vectors)")
     p.add_argument("--query", required=True)
     p.add_argument("--index", required=True)

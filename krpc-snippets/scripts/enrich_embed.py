@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from krpc_snippets.enrich.embed import EmbedConfig, embed_records, write_sqlite, write_jsonl, write_parquet
+from krpc_snippets.utils.env import load_env_defaults
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -21,6 +22,8 @@ def _load_jsonl(path: Path) -> list[dict]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    # Load local environment defaults (e.g., OPENAI_API_KEY) if present
+    load_env_defaults()
     p = argparse.ArgumentParser(description="Generate embeddings for snippet records (OpenAI or mock)")
     p.add_argument("--in", dest="infile", required=True)
     p.add_argument("--out-sqlite", dest="out_sqlite")
@@ -64,4 +67,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

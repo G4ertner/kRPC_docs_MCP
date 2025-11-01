@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from krpc_snippets.enrich.summarise import SummarizerConfig, summarise_snippets
+from krpc_snippets.utils.env import load_env_defaults
 from krpc_snippets.store import jsonl as jsonl_store
 from krpc_snippets.store.validation import validate_snippet
 
@@ -24,6 +25,8 @@ def _load_jsonl(path: Path) -> list[dict]:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    # Load local environment defaults (e.g., OPENAI_API_KEY) if present
+    load_env_defaults()
     p = argparse.ArgumentParser(description="Summarise/tag snippets via OpenAI (with mock/caching)")
     p.add_argument("--in", dest="infile", required=True)
     p.add_argument("--out", dest="out", required=True)
@@ -55,4 +58,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

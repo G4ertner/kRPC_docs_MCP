@@ -14,6 +14,13 @@ _SIDE_DIR = Path(__file__).resolve().parents[1] / "krpc-snippets"
 if _SIDE_DIR.exists() and str(_SIDE_DIR) not in _sys.path:
     _sys.path.insert(0, str(_SIDE_DIR))
 
+# Best-effort: load OPENAI_API_KEY and other entries from krpc-snippets/.env
+try:
+    from krpc_snippets.utils.env import load_env_defaults as _load_env_defaults  # type: ignore
+    _load_env_defaults()
+except Exception:
+    pass
+
 
 # ---------- Paths & loaders ----------
 

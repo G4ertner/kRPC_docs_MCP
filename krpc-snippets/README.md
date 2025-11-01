@@ -182,3 +182,10 @@ Playbooks (Codex)
 - `krpc-snippets/playbooks/codex/30-resolve-and-bundle.md`
 - `krpc-snippets/playbooks/codex/40-eval-and-bench.md`
 - `krpc-snippets/playbooks/codex/50-mcp-usage.md`
+
+MCP Playbooks (resources)
+- Maneuver node planning: `resource://playbooks/maneuver-node`
+- Flight control loop: `resource://playbooks/flight-control`
+- Rendezvous & docking: `resource://playbooks/rendezvous-docking`
+- Vessel blueprint usage: `resource://playbooks/vessel-blueprint-usage`
+- Snippets tools cheatsheet: `resource://snippets/usage`

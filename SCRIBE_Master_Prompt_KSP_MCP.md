@@ -152,6 +152,17 @@ Notes
 
 ---
 
+## 📚 Quick Playbooks (as MCP resources)
+- Maneuver node planning: `resource://playbooks/maneuver-node`
+- Flight control loop: `resource://playbooks/flight-control`
+- Rendezvous & docking: `resource://playbooks/rendezvous-docking`
+- Vessel blueprint usage: `resource://playbooks/vessel-blueprint-usage`
+- Snippets tools cheatsheet: `resource://snippets/usage`
+
+Use these playbooks to structure your plan and tool calls before generating scripts.
+
+---
+
 ## 📌 E — Examples
 
 ### Example: Planning Response (before scripting)
