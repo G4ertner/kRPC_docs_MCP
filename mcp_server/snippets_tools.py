@@ -200,7 +200,8 @@ def snippets_get(id: str, include_code: bool = False) -> str:
         if r.get("id") == id:
             out = dict(r)
             if not include_code:
-                out["code"] = ("" if out.get("code") else out.get("code"))
+                # Normalize hidden code to empty string for predictable consumers.
+                out["code"] = ""
             return json.dumps({"ok": True, "snippet": out})
     return json.dumps({"ok": False, "error": f"id not found: {id}"})
 
