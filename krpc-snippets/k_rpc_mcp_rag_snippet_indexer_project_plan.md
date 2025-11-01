@@ -43,11 +43,17 @@ Out of scope (initial): Code execution sandboxing, refactoring whole repos, code
 - **ndeutschmann‑fun/ksp‑ap** — Ascent autopilot modules, vis‑viva circularisation, suicide‑burn; modular architecture.  https://github.com/ndeutschmann-fun/ksp-ap
   LOADED: commit 38f9a7…, snippets=0 (repository uses Python 2 style in key modules; extraction skipped)
 - **whatdamath/KerbalSpaceProgram** — Dynamic‑pressure‑limited ascent and circularisation node execution.  https://github.com/whatdamath/KerbalSpaceProgram
+  LOADED: commit 7416b2…, snippets=2 (indexed; live embeddings)
 - **BlackBreezeCastle/peg‑for‑krpc‑python** — Powered Explicit Guidance (PEG) for ascent guidance (pair with your control loop).  https://github.com/BlackBreezeCastle/peg-for-krpc-python
+  LOADED: commit 529e8c…, snippets=103 (indexed; live embeddings)
 - **pmauby/ksp‑autopilot** — Recoverable booster state machine: ascent, stage, flip, boost‑back, glide, land (PID).  https://github.com/pmauby/ksp-autopilot
+  LOADED: commit 75f818…, snippets=5 (indexed; live embeddings)
 - **vmeazevedo/ksp_orbital_rocket_automation** — End‑to‑end launch→orbit→re‑entry→parachute landing.  https://github.com/vmeazevedo/ksp_orbital_rocket_automation
+  LOADED: commit 85879d…, snippets=0 (single top-level script; no extractable functions/classes)
 - **Hansastro/KSP_Adventure** — Mission scripts: science collection, ascent, safe recovery; good for utility patterns.  https://github.com/Hansastro/KSP_Adventure
+  LOADED: commit d150ab…, snippets=7 (indexed; live embeddings)
 - **Genhis/KRPC.MechJeb** — kRPC service exposing MechJeb autopilots (ascent/plane etc.) for scriptable control.  https://github.com/Genhis/KRPC.MechJeb
+  LOADED: commit 398bc3…, snippets=1 (indexed; live embeddings; tutorials only; likely restricted license)
 
 > The ingest pipeline records **repo URL**, **commit hash**, **licence**, and **file paths** in every snippet record to ensure provenance and compliance.
 

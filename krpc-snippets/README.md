@@ -189,3 +189,39 @@ MCP Playbooks (resources)
 - Rendezvous & docking: `resource://playbooks/rendezvous-docking`
 - Vessel blueprint usage: `resource://playbooks/vessel-blueprint-usage`
 - Snippets tools cheatsheet: `resource://snippets/usage`
+
+Snippet Overview (loaded corpus)
+- Total snippets indexed: 333
+- License breakdown (from enrichment):
+  - MIT: 156
+  - GPL‑3.0: 8 (flagged restricted; hide with `exclude_restricted=true`)
+  - UNKNOWN/other: 169 (upstream repos lacking clear LICENSE; handled per policy)
+- Categories coverage (count of records):
+  - method: 171, function: 118, class: 39, const: 5
+- Per‑repo counts (commit markers in plan file):
+  - 154 — kRPC/krpc‑library
+  - 103 — BlackBreezeCastle/peg‑for‑krpc‑python (PEG guidance, ascent/orbit utilities)
+  - 27 — Jake1402/KSP‑PID‑Hovering (hover/landing PID, control loops)
+  - 15 — alexlabbane/kRPC‑mun‑mission (LKO→Mun transfer/landing utilities)
+  - 10 — azolotarev/ksp‑with‑python (landing & suicide‑burn computations)
+  - 9 — AlanCunningham/krpc‑scripts (ascent, circularisation, utilities)
+  - 7 — Hansastro/KSP_Adventure (science/missions, utility patterns)
+  - 5 — pmauby/ksp‑autopilot (recoverable booster, PID control)
+  - 2 — whatdamath/KerbalSpaceProgram (dyn‑pressure ascent, node execution)
+  - 1 — Genhis/KRPC.MechJeb (tutorial snippet; MechJeb kRPC service)
+  - 0 — ndeutschmann‑fun/ksp‑ap (Python 2 style; skipped)
+  - 0 — vmeazevedo/ksp_orbital_rocket_automation (single top‑level script; skipped)
+
+Representative capabilities
+- Ascent and gravity turns (classic, advanced, dynamic‑pressure constrained)
+- Circularisation and maneuver node execution
+- Rendezvous planning and docking (including MechJeb service tutorials)
+- PID control for hover/landing and throttle regulation
+- PEG‑style guidance utilities and orbital math helpers
+
+Quick Codex prompts
+- `snippets_search({"query":"ascent autopilot","k":5,"mode":"hybrid","rerank":true})`
+- `snippets_search({"query":"circularize orbit","k":5,"mode":"hybrid"})`
+- `snippets_search({"query":"rendezvous docking","k":5,"mode":"hybrid"})`
+- `snippets_search({"query":"suicide burn altitude","k":5,"mode":"hybrid"})`
+- Resolve top‑1: `snippets_search_and_resolve({"query":"PEG guidance","k":5,"mode":"hybrid"})`
