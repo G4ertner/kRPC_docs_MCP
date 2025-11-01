@@ -1,0 +1,21 @@
+{
+  "id": "c77a9a9eacaa4e01a0a3f6c532b2a3f1",
+  "repo": "https://github.com/example/krpc-sample",
+  "commit": "abcdef1234567890abcdef1234567890abcdef12",
+  "path": "src/ascent.py",
+  "lang": "python",
+  "name": "Circularise orbit at Ap",
+  "description": "Compute a circularisation burn at apoapsis and create a node.",
+  "code": "# Example snippet\nfrom math import sqrt\n\nG0 = 9.80665\n# ...\n",
+  "categories": ["ascent", "circularisation"],
+  "dependencies": [],
+  "license": "MIT",
+  "license_url": "https://opensource.org/licenses/MIT",
+  "created_at": "2025-01-01T00:00:00Z",
+  "restricted": false,
+  "inputs": ["conn", "vessel"],
+  "outputs": ["node_ut", "dv_m_s"],
+  "when_to_use": "After reaching an elliptical parking orbit.",
+  "size_bytes": 64,
+  "lines_of_code": 4
+}

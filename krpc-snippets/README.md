@@ -22,3 +22,12 @@ Layout
 - `data/` — placeholder for datasets (JSONL/Parquet/SQLite) generated later
 - `artifacts/` — placeholder for exports and benchmarks
 - `ci/` — placeholder for CI docs/config
+ - `scripts/` — helper scripts (e.g., schema validation)
+
+Step A2 — Snippet JSON schema
+- Schema file: `krpc_snippets/schemas/snippet.schema.json`
+- Fixtures: `data/fixtures/snippet_valid.json`, `data/fixtures/snippet_invalid_missing_fields.json`
+- Validate (requires jsonschema):
+  - `uv pip install jsonschema`
+  - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_valid.json`
+  - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json` (should report errors and exit non‑zero)

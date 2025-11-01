@@ -119,10 +119,15 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - Module: `uv --directory krpc-snippets run -m krpc_snippets.cli --help`
   - Console script (after editable install): `uv run krpc-snippets --help`
 
-**A2. Snippet JSON schema**
-- Deliverables: `schemas/snippet.schema.json` defining `{ id, repo, commit, path, lang, name, description, code, categories[], dependencies[], license, license_url, created_at }`.
-- Auto: JSON schema validator with a small fixture corpus; fails on missing required fields.
-- Manual: Inspect a generated sample record.
+**A2. Snippet JSON schema (implemented)**
+- Deliverables (as implemented):
+  - Schema: `krpc_snippets/schemas/snippet.schema.json` with required fields `{ id, repo, commit, path, lang, name, description, code, categories[], dependencies[], license, license_url, created_at }` and optional metadata (`restricted`, `inputs`, `outputs`, `when_to_use`, `size_bytes`, `lines_of_code`).
+  - Fixtures: `krpc-snippets/data/fixtures/snippet_valid.json` and `krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json`.
+  - Validator script: `krpc-snippets/scripts/schema_validate.py` (uses `jsonschema`).
+- Auto: Run validator on fixtures; valid exits 0, invalid exits non‑zero.
+  - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_valid.json`
+  - `uv --directory . run python krpc-snippets/scripts/schema_validate.py krpc-snippets/data/fixtures/snippet_invalid_missing_fields.json`
+- Manual: Extend fixtures as needed; inspect errors for clarity and completeness.
 
 **A3. Storage adapters** (JSONL + Parquet + SQLite)
 - Deliverables: `src/store/` with read/write APIs.

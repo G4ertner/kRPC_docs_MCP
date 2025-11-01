@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/krpc-snippets/snippet.schema.json",
+  "title": "kRPC Snippet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "repo",
+    "commit",
+    "path",
+    "lang",
+    "name",
+    "description",
+    "code",
+    "categories",
+    "dependencies",
+    "license",
+    "license_url",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Stable id (e.g., hash of repo+commit+path+span)."
+    },
+    "repo": {
+      "type": "string",
+      "format": "uri",
+      "description": "Repository URL"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{7,64}$",
+      "description": "Commit SHA (7..64 hex)"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repository-relative file path"
+    },
+    "lang": {
+      "type": "string",
+      "enum": ["python"],
+      "description": "Programming language"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short human-friendly name"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Natural-language summary (what/why/how)"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Code snippet text"
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Functional tags (e.g., ascent, circularisation, landing)"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Identifiers or qualified names that this snippet requires"
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "description": "SPDX identifier or license name"
+    },
+    "license_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Canonical license URL"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Record creation timestamp (ISO 8601)"
+    },
+    "restricted": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if license restricts redistribution or usage (e.g., GPL)"
+    },
+    "inputs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional: input parameters"
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional: output values"
+    },
+    "when_to_use": {
+      "type": "string",
+      "description": "Optional: guidance when this snippet applies"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional: code size in bytes"
+    },
+    "lines_of_code": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional: code lines count"
+    }
+  }
+}
+
