@@ -246,14 +246,19 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - Policy doc: `krpc-snippets/docs/license_policy.md` — guidance on detection sources, restricted families, and CI usage.
 - Auto: Audit on sample snippets shows all MIT (no restricted/unknown); ready to wire into CI fail gates.
 
-**E2. Query benchmark & eval harness**
-- Deliverables: `eval/queries.jsonl` (seed queries + expected ids), `scripts/eval_retrieval.py` computing Top‑K accuracy & NDCG.
-- Auto: CI gate (e.g., Top‑3 ≥ 60% initially; ratchet upwards over time).
-- Manual: Curator runbook for adjusting “goldens”.
+**E2. Query benchmark & eval harness (implemented)**
+- Deliverables (as implemented):
+  - Dataset: `krpc-snippets/eval/queries.jsonl` with seed queries and expected ids.
+  - Metrics: `krpc_snippets/eval/metrics.py` (topK, MRR, NDCG@K).
+  - Script: `krpc-snippets/scripts/eval_retrieval.py` — evaluates keyword and hybrid (optional rerank); outputs JSON report with macro + per‑query metrics; supports fail gates (`--min-top3`, `--min-ndcg10`).
+- Auto: Sanity runs on sample corpus produce expected results; ready for CI thresholds.
+- Manual: Curator can expand queries and adjust expected ids over time.
 
-**E3. Performance tests**
-- Deliverables: `scripts/bench_search.py` measuring P95 latency and memory footprint on N≈5k snippets.
-- Auto: Fails if latency > target; emits flamegraph (optional).
+**E3. Performance tests (implemented)**
+- Deliverables (as implemented):
+  - Script: `krpc-snippets/scripts/bench_search.py` — measures P50/P95/avg latency (ms) and RSS memory (MB) for keyword and hybrid (mock or live) across a query set.
+  - Config: `--queries`, `--snippets`, `--index`, embeddings source, `--mode keyword|hybrid`, `--iters`, `--warmup`, `--mock`.
+- Auto: Bench on sample corpus yields sub‑millisecond keyword and low‑millisecond hybrid latencies; ready to add CI thresholds.
 
 **E4. CI pipeline**
 - Deliverables: GitHub Actions (lint, type, unit, eval, licence audit, build). Binary cache for embeddings if applicable.
