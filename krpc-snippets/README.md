@@ -118,3 +118,12 @@ Step C1 — LLM summariser & tagger
   - `uv --directory . run python krpc-snippets/scripts/enrich_summarise.py --in <snippets.jsonl> --out <snippets_enriched.jsonl> --only-empty --validate`
   - Add `--mock` to force mock mode; set `--model` to choose model (default `gpt-4o-mini`)
   - Ensure `OPENAI_API_KEY` in environment (unquoted) when not using `--mock`
+
+Step C2 — Embedding generator
+- Module: `krpc_snippets/enrich/embed.py`
+  - Builds input text (name/description/code_head), calls OpenAI embeddings (or mock), caches per snippet+model, and writes outputs
+  - Default model: `text-embedding-3-small`; enable `--normalize` for L2-normalized vectors
+- CLI: `krpc-snippets/scripts/enrich_embed.py`
+  - Mock (no API): `uv --directory . run python krpc-snippets/scripts/enrich_embed.py --in <snippets.jsonl> --out-sqlite krpc-snippets/data/embeddings.sqlite --out-jsonl krpc-snippets/data/embeddings.jsonl --mock --normalize`
+  - Live: set `OPENAI_API_KEY` and drop `--mock`; choose `--model`
+  - Parquet (optional): add `--out-parquet krpc-snippets/data/embeddings.parquet` (requires `pyarrow`)

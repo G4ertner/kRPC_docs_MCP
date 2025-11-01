@@ -198,9 +198,13 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Mock mode used for development sanity; record‑by‑record schema validation passes.
 - Manual: Live test run with provided API key on sample snippets succeeded; output JSONL written and validated.
 
-**C2. Embedding generator**
-- Deliverables: `src/enrich/embed.py` generating embeddings for `name + description + code_head`. Pluggable model name.
-- Auto: Mocked embedding client; vector dimension/shape checks; deterministic seed path.
+**C2. Embedding generator (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/enrich/embed.py` — builds input text (name/description/code head), calls OpenAI embeddings (or mock), caches per snippet+model, optional L2 normalize.
+  - Storage writers: SQLite (`embeddings` table), JSONL, and Parquet (requires `pyarrow`).
+  - CLI: `krpc-snippets/scripts/enrich_embed.py` — outputs to any of SQLite/JSONL/Parquet; flags for model, fields, code head length, normalize, batch size, cache dir, mock.
+- Auto: Mock mode test on sample snippets → 4 embeddings persisted to SQLite + JSONL; dimensions/shape verified; normalization enabled.
+- Manual: Live run optional with `OPENAI_API_KEY`; default model `text-embedding-3-small`.
 
 **C3. Keyword index (inverted)**
 - Deliverables: `src/index/keyword.py` (tokeniser + inverted index + boosted title/description weights). CLI: `scripts/search_keyword.py`.
