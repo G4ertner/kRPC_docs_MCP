@@ -206,9 +206,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Mock mode test on sample snippets → 4 embeddings persisted to SQLite + JSONL; dimensions/shape verified; normalization enabled.
 - Manual: Live run optional with `OPENAI_API_KEY`; default model `text-embedding-3-small`.
 
-**C3. Keyword index (inverted)**
-- Deliverables: `src/index/keyword.py` (tokeniser + inverted index + boosted title/description weights). CLI: `scripts/search_keyword.py`.
-- Auto: Query tests on fixtures (“circularise orbit” → expected ids appear in Top‑3).
+**C3. Keyword index (inverted) (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/index/keyword.py` — tokeniser (alnum + CamelCase split), weighted fields (name/categories/inputs/description/code head), IDF scoring, JSON save/load.
+  - CLI: `krpc-snippets/scripts/search_keyword.py` — build, query (OR/AND, category filter, exclude restricted), and ad-hoc mode.
+- Auto: Synthetic corpus indexed (docs=4); queries for “NavHelper” and “helper” return expected class/method in Top‑2.
 
 **C4. Vector store & hybrid retrieval**
 - Deliverables: `src/index/vector.py` (FAISS/SQLite); `src/search/hybrid.py` that merges keyword + vector results with simple rank fusion.

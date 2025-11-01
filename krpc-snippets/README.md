@@ -127,3 +127,12 @@ Step C2 — Embedding generator
   - Mock (no API): `uv --directory . run python krpc-snippets/scripts/enrich_embed.py --in <snippets.jsonl> --out-sqlite krpc-snippets/data/embeddings.sqlite --out-jsonl krpc-snippets/data/embeddings.jsonl --mock --normalize`
   - Live: set `OPENAI_API_KEY` and drop `--mock`; choose `--model`
   - Parquet (optional): add `--out-parquet krpc-snippets/data/embeddings.parquet` (requires `pyarrow`)
+
+Step C3 — Keyword index (inverted)
+- Module: `krpc_snippets/index/keyword.py`
+  - Tokenises name/description/categories/inputs and a short code head with weighted TF and IDF; simple OR/AND query logic
+  - Saves/loads a portable JSON index
+- CLI: `krpc-snippets/scripts/search_keyword.py`
+  - Build: `uv --directory . run python krpc-snippets/scripts/search_keyword.py build --in krpc-snippets/data/snippets_enriched.jsonl --out krpc-snippets/data/keyword_index.json`
+  - Query: `uv --directory . run python krpc-snippets/scripts/search_keyword.py query --index krpc-snippets/data/keyword_index.json --query "NavHelper" --k 5`
+  - Ad-hoc: `uv --directory . run python krpc-snippets/scripts/search_keyword.py adhoc --in krpc-snippets/data/snippets_enriched.jsonl --query "helper" --k 5`
