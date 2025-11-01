@@ -97,3 +97,13 @@ Step B6 — License detection and enrichment
   - Detect only: `uv --directory . run python krpc-snippets/scripts/license_detect.py --root <repo> --write-summary`
   - Enrich JSONL: `uv --directory . run python krpc-snippets/scripts/license_detect.py --root <repo> --snippets <in.jsonl> --out <out.jsonl> --only-if-unknown --validate`
   - Policy: use `--fail-on-restricted` to exit non-zero when license is GPL-family
+
+Step B7 — Provenance recorder & auditor
+- Module: `krpc_snippets/ingest/provenance.py`
+  - Fills/normalizes `repo`, `commit`, and `path` (repo-relative POSIX), using `fetch.json` if present
+  - Verifies deterministic `id` by resolving node spans, and can recompute ids when unambiguous
+  - Exports a simple provenance map `{id, repo, commit, path, created_at}`
+- CLI: `krpc-snippets/scripts/provenance_audit.py`
+  - Audit: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl>`
+  - Fix: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl> --fix --out <out.jsonl> [--repair-id] [--validate]`
+  - Export map: `uv --directory . run python krpc-snippets/scripts/provenance_audit.py --root <repo> --snippets <in.jsonl> --provenance-map --out <map.jsonl>`

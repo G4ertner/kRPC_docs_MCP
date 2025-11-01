@@ -183,9 +183,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/license_detect.py` — detect-only (writes `<root>/license.json`), or enrich JSONL with `license`, `license_url`, `restricted`; options: `--only-if-unknown`, `--fail-on-restricted`, `--validate`.
 - Auto: Synthetic MIT and GPL-3 repos detected correctly (MIT unrestricted; GPL-3 restricted). Enrichment preserves schema validity.
 
-**B7. Provenance recorder**
-- Deliverables: Attach `{repo, commit, path}` to every snippet; compute stable `id` = hash(repo+commit+path+span).
-- Auto: Deterministic id test (same input→same id; different span→different id).
+**B7. Provenance recorder (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/provenance.py` — fill/normalize `repo`, `commit`, and `path` (via `fetch.json` or CLI); audit records; recompute stable id (repo+commit+path+kind+qualname+span) when a unique span resolves; export a provenance map.
+  - CLI: `krpc-snippets/scripts/provenance_audit.py` — audit-only, fix (with optional `--repair-id`), and provenance map export; schema validation optional.
+- Auto: Sanity over sample snippets shows zero mismatches; fix mode preserves ids; provenance map export works.
 
 ### Phase C — Enrichment (LLM) & Indexing
 **C1. LLM summariser & tagger**
