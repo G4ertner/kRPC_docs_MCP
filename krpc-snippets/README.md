@@ -69,3 +69,12 @@ Step B2 — File discovery & repo-level excludes
     - `uv --directory . run python krpc-snippets/scripts/walk_repo_cli.py --root krpc-snippets/data/repos/<slug> --head 5`
     - `uv --directory . run python krpc-snippets/scripts/walk_repo_cli.py --root krpc-snippets/data/repos/<slug> --use-git --exclude "**/tests/**"`
   - Place a `.krpc-snippets-ignore` at the repo root to exclude custom globs
+
+Step B4 — Snippet extraction
+- Module: `krpc_snippets/ingest/extract_snippets.py`
+  - Extracts functions, methods, classes, and first const block into schema-compliant records with stable ids
+  - Provenance from `--repo-url/--commit` or detected from `fetch.json` at repo root
+- CLI: `krpc-snippets/scripts/extract_snippets.py`
+  - Single file: `uv --directory . run python krpc-snippets/scripts/extract_snippets.py --root <repo> --file a/sample.py --out krpc-snippets/data/snippets.jsonl --license MIT --license-url https://opensource.org/licenses/MIT --validate`
+  - Whole repo: `uv --directory . run python krpc-snippets/scripts/extract_snippets.py --root <repo> --all --out krpc-snippets/data/snippets.jsonl`
+  - Output JSONL is ready for store adapters; validate with `scripts/schema_validate.py`

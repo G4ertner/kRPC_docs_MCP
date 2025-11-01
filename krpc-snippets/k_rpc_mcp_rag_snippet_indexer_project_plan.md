@@ -165,9 +165,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/ast_parse_cli.py` — `--path`, `--json` (with `--no-code`), `--summary`, `--functions`, `--classes`, `--consts`.
 - Auto: Sanity file under `krpc-snippets/data/test_repo_fs/a/sample.py` verified; line spans and names extracted correctly; const block detected.
 
-**B4. Snippet extraction**
-- Deliverables: `src/ingest/extract_snippets.py` turning AST nodes into snippet records per schema.
-- Auto: Ensures `name`, `description` (from docstring/comments fallback), `code` slice, file path, and `id` hashing are correct.
+**B4. Snippet extraction (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/extract_snippets.py` — builds schema-compliant records from parsed AST (functions, methods, classes, first const block) with stable ids (hash of repo+commit+path+kind+qualname+span), provenance from CLI or `fetch.json`.
+  - CLI: `krpc-snippets/scripts/extract_snippets.py` — supports single file or full repo extraction, sets default license fields, toggles to include/exclude kinds, optional schema validation, outputs JSONL.
+- Auto: Sanity on sample file yields 4 records (function, class, method, const). Records validated prior to write; JSONL round-trip via store CLI succeeds.
 
 **B5. Dependency analysis**
 - Deliverables: `src/ingest/deps.py` building per‑snippet `dependencies[]` via static calls, qualified names, and cross‑file map.
