@@ -174,3 +174,11 @@ Step D1 — Dependency-aware resolver
 - CLI: `krpc-snippets/scripts/resolve_snippet.py`
   - By id: `uv --directory . run python krpc-snippets/scripts/resolve_snippet.py --snippets krpc-snippets/data/snippets_extracted.jsonl --id <snippet_id> --out krpc-snippets/data/bundle.py`
   - By name: `uv --directory . run python krpc-snippets/scripts/resolve_snippet.py --snippets krpc-snippets/data/snippets_extracted.jsonl --name a.sample.NavHelper.circ_dv --out krpc-snippets/data/bundle_navhelper.py`
+
+Playbooks (Codex)
+- `krpc-snippets/playbooks/codex/00-setup.md`
+- `krpc-snippets/playbooks/codex/10-fetch-and-ingest.md`
+- `krpc-snippets/playbooks/codex/20-enrich-and-index.md`
+- `krpc-snippets/playbooks/codex/30-resolve-and-bundle.md`
+- `krpc-snippets/playbooks/codex/40-eval-and-bench.md`
+- `krpc-snippets/playbooks/codex/50-mcp-usage.md`

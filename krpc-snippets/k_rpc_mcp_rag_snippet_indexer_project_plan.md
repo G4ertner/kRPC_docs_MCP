@@ -281,10 +281,18 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - Add status badge and matrix for Python 3.10/3.11
 
 ### Phase F — Developer Experience & Docs
-**F1. Codex CLI playbooks**
-- Deliverables: `playbooks/codex/` with command snippets to: ingest a repo, enrich, index, search, resolve, and export.
-- Auto: Dry‑run tests (no network) using mocks; ensures CLI examples don’t rot.
-- Manual: End‑to‑end demo following the README.
+**F1. Codex CLI playbooks (implemented)**
+- Deliverables (as implemented):
+  - `krpc-snippets/playbooks/codex/` with step‑by‑step command guides:
+    - `00-setup.md` — venv/install, optional enrich extras and OPENAI key
+    - `10-fetch-and-ingest.md` — fetch, walk, extract, deps, license, provenance
+    - `20-enrich-and-index.md` — summarise (mock/live), embeddings (mock/live), keyword/hybrid/rerank search
+    - `30-resolve-and-bundle.md` — resolve by id/name with caps
+    - `40-eval-and-bench.md` — eval (keyword/hybrid), bench (keyword)
+    - `50-mcp-usage.md` — snippets MCP tools usage and usage resource
+  - README links to all playbooks
+- Auto: Commands default to mock (no API). Live paths clearly marked for OPENAI usage.
+- Manual: End‑to‑end demo reproducible from setup → MCP usage.
 
 **F2. User docs**
 - Deliverables: `docs/` with “Getting Started”, “Ingestion”, “Search”, “Resolution”, “Licensing”, “Troubleshooting”.
