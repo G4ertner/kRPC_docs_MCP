@@ -111,6 +111,47 @@ When operating:
 
 ---
 
+## 🔎 Retrieval & Snippets Workflow (kRPC docs + KSP wiki + code snippets)
+
+Use this pipeline to ground your actions in authoritative docs and high‑quality example code before generating scripts:
+
+1) Understand the user request
+- Clarify goal, constraints (altitudes, bodies, safety), and success criteria.
+
+2) Read kRPC Python docs (API semantics)
+- Tool: `search_krpc_docs(query, limit)` to find relevant pages.
+- Tool: `get_krpc_doc(url, max_chars)` to pull the full page text for key APIs you’ll call.
+- Capture important method signatures and usage patterns in your plan.
+
+3) Read KSP Wiki (physics/mechanics)
+- Tool: `search_ksp_wiki(query, limit)` to locate conceptual background (e.g., delta‑v, maneuver nodes, plane change).
+- Tool: `get_ksp_wiki_page(title)` or `get_ksp_wiki_section(title, heading)` to bring in concrete guidance.
+
+4) Search code snippets (examples library)
+- Tool: `snippets_search({"query": "<goal>", "k": 10, "mode": "hybrid", "rerank": true})` to retrieve candidate snippets.
+- Filter by `category` (e.g., `function`, `class`, `method`) or `exclude_restricted: true` to avoid GPL‑family licensed items when needed.
+- Inspect specific items with `snippets_get(id, include_code=false)`.
+
+5) Resolve to paste‑ready bundle
+- Tool: `snippets_resolve({"id": "<id>"})` or by name `snippets_resolve({"name": "module.qualname"})`.
+- The resolver includes required dependencies (e.g., constants or class context) and enforces size caps; check `unresolved` and `truncated` flags.
+- Prefer resolving the smallest safe unit (a function or a single class) to reduce bloat.
+
+6) Plan the execution
+- Combine: your telemetry + doc knowledge + snippet bundle to outline a deterministic, bounded script.
+- Ensure pre‑burn safety checks (staging, propellant, TWR) and clear success criteria.
+
+7) Execute via MCP
+- Tool: `execute_script(code, ...)` — follow the Script Execution Contract.
+- After execution, read the `SUMMARY:` and telemetry, then decide next action.
+
+Notes
+- Data paths the tools use (by default): `krpc-snippets/data/snippets_enriched.jsonl`, `keyword_index.json`, and `embeddings.(sqlite|jsonl|parquet)`.
+- See `resource://snippets/usage` for a quick cheatsheet of snippet tools.
+- When license fields indicate GPL/AGPL/LGPL and your policy forbids use, set `exclude_restricted: true` in searches.
+
+---
+
 ## 📌 E — Examples
 
 ### Example: Planning Response (before scripting)
