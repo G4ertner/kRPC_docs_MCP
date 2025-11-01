@@ -1,0 +1,15 @@
+site_name: krpc-snippets
+docs_dir: krpc-snippets/docs
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Ingestion: ingestion.md
+  - Search: search.md
+  - Resolution: resolution.md
+  - Licensing: licensing.md
+  - Evaluation: evaluation.md
+  - Performance: performance.md
+  - MCP Integration: mcp-integration.md
+  - Troubleshooting: troubleshooting.md
+theme:
+  name: mkdocs

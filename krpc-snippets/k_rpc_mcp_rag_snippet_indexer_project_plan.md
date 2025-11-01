@@ -231,9 +231,16 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/resolve_snippet.py` — resolve by `--id` or `--name module.qualname`, with output path and caps.
 - Auto: Sanity on sample corpus — method target emits parent class + consts; function target emits consts + function; bundle markers and deterministic order verified.
 
-**D2. MCP tools**
-- Deliverables: `src/mcp/tools.py` exposing `search_snippets(query)`, `get_snippet(id)`, `resolve_snippet(id)`, `search_and_resolve(query)`.
-- Auto: Tool contract tests; JSON serialisation; error handling.
+**D2. MCP tools (implemented)**
+- Deliverables (as implemented):
+  - Registration under main MCP server: `mcp_server/snippets_tools.py` exposes tools:
+    - `snippets_search(query, k, mode='keyword'|'hybrid', and_logic, category, exclude_restricted, rerank)`
+    - `snippets_get(id, include_code)`
+    - `snippets_resolve(id|name, max_bytes, max_nodes)`
+    - `snippets_search_and_resolve(query, ...)` (convenience)
+  - Resource: `resource://snippets/usage` with quick help and default data paths
+  - Tools delegate to `krpc_snippets` modules (keyword index, hybrid/rerank, resolver)
+- Auto: Verified in chat — keyword/hybrid results correct; get/resolve return records and paste‑ready bundles; one‑shot behaves as expected.
 
 **D3. HTTP API (optional)**
 - Deliverables: Minimal FastAPI app for local/dev consumption by other agents.
@@ -294,9 +301,15 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Commands default to mock (no API). Live paths clearly marked for OPENAI usage.
 - Manual: End‑to‑end demo reproducible from setup → MCP usage.
 
-**F2. User docs**
-- Deliverables: `docs/` with “Getting Started”, “Ingestion”, “Search”, “Resolution”, “Licensing”, “Troubleshooting”.
-- Auto: Link checker; doctest for inline code blocks where possible.
+**F2. User docs (implemented)**
+- Deliverables (as implemented):
+  - `krpc-snippets/docs/` with:
+    - `index.md` (TOC), `getting-started.md`, `ingestion.md`, `search.md`, `resolution.md`, `licensing.md`, `evaluation.md`, `performance.md`, `mcp-integration.md`, `troubleshooting.md`
+    - Existing policy: `license_policy.md` referenced from `licensing.md`
+  - Minimal MkDocs config at `krpc-snippets/mkdocs.yml` (serve with `uv run mkdocs serve -f krpc-snippets/mkdocs.yml`)
+- Notes:
+  - Focused on runnable CLI examples using mock paths by default; live OpenAI usage clearly marked via environment variable
+  - Link checker/doctest not added yet; can be considered later in CI
 
 **F3. Release packaging**
 - Deliverables: Versioned wheel; changelog; `--version` flag; SemVer tagging.
