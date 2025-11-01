@@ -27,3 +27,9 @@ data/errors.json
 
 # Build artifacts
 *.egg-info/
+
+# Local environment files (API keys)
+.env
+krpc-snippets/.env
+krpc-snippets/data/enrich_cache/
+krpc-snippets/data/embed_cache/
