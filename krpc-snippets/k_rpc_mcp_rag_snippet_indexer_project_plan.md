@@ -153,9 +153,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Local offline test using a temporary git repo; verified resolved commit and manifest written.
 - Manual: Fetching multiple seed repos via JSONL batch; inspect manifests and working copies.
 
-**B2. File discovery & language detection**
-- Deliverables: `src/ingest/walk_repo.py` (filters to .py, optional globs, ignore vendored dirs).
-- Auto: Walks a synthetic repo; excludes ignored paths; returns stable list order.
+**B2. File discovery & language detection (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/walk_repo.py` — discovers Python files using `git ls-files` or filesystem walk; supports include/exclude globs, repo-level ignores via `.krpc-snippets-ignore`, default excluded directories, size cap, and returns stable sorted `FileInfo[]` with `sha256` and `size_bytes`.
+  - CLI: `krpc-snippets/scripts/walk_repo_cli.py` — flags: `--root`, `--use-git`, `--max-size`, `--include`, `--exclude-dir`, `--exclude`, `--count`, `--head`.
+- Auto: Synthetic local repo tree verified — default excludes applied, repo-level ignore patterns respected, deterministic ordering.
 
 **B3. Python AST parser**
 - Deliverables: `src/ingest/python_ast.py` extracting top‑level functions/classes, docstrings, leading comments, constant config blocks.

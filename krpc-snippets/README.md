@@ -57,3 +57,15 @@ Step B1 — Git fetcher (clone/update + checkout)
   - Batch JSONL (lines like `{ "url": "...", "branch": "main", "sha": "..." }`):
     - `uv --directory . run python krpc-snippets/scripts/fetch_repo.py --file repos.jsonl --out krpc-snippets/data/repos`
   - Output: per‑repo folder at `krpc-snippets/data/repos/<slug>/` with `fetch.json`
+
+Step B2 — File discovery & repo-level excludes
+- Module: `krpc_snippets/ingest/walk_repo.py`
+  - `discover_python_files(repo_root, opts)` returns stable, filtered `FileInfo[]`
+  - Repo-level ignores: patterns from `.krpc-snippets-ignore` in the repo root (glob lines, `#` for comments)
+  - Default excludes: `default_exclude_dirs()` (e.g., `.git`, `__pycache__`, `.venv`, `node_modules`, etc.)
+- CLI: `krpc-snippets/scripts/walk_repo_cli.py`
+  - Examples:
+    - `uv --directory . run python krpc-snippets/scripts/walk_repo_cli.py --root krpc-snippets/data/repos/<slug> --count`
+    - `uv --directory . run python krpc-snippets/scripts/walk_repo_cli.py --root krpc-snippets/data/repos/<slug> --head 5`
+    - `uv --directory . run python krpc-snippets/scripts/walk_repo_cli.py --root krpc-snippets/data/repos/<slug> --use-git --exclude "**/tests/**"`
+  - Place a `.krpc-snippets-ignore` at the repo root to exclude custom globs
