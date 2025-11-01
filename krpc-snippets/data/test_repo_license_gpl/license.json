@@ -1,0 +1,14 @@
+{
+  "license": {
+    "spdx_id": "GPL-3.0",
+    "name": "GPL-3.0",
+    "url": "https://www.gnu.org/licenses/gpl-3.0-standalone.html",
+    "restricted": true,
+    "source": "HEURISTIC",
+    "file_path": "/home/nikolas/krpc-docs/krpc-snippets/data/test_repo_license_gpl/LICENSE"
+  },
+  "spdx_headers": {
+    "files_with_spdx": 0,
+    "total_py_files": 0
+  }
+}

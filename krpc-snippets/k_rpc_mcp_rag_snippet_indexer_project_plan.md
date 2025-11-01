@@ -177,9 +177,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/deps_analyze_repo.py` — enriches existing or freshly extracted snippets with `dependencies[]`.
 - Auto: Synthetic multi-file example verifies `a.main2.calls` depends on `pkg.util.helper`; class/method handling and non-local calls ignored.
 
-**B6. Licence detector**
-- Deliverables: `src/governance/license.py` (SPDX detection from LICENSE file + GitHub API fallback + file headers). Flags GPL‑family.
-- Auto: Fixtures for MIT, BSD‑3, GPL‑3; sets `license` and `license_url`; marks `restricted=True` for GPL.
+**B6. Licence detector (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/governance/license.py` — detects repo license from LICENSE/COPYING (SPDX or heuristics) or SPDX headers in files; returns SPDX id, canonical URL, and `restricted` flag (GPL/AGPL/LGPL families); helper to enrich snippet records with license fields.
+  - CLI: `krpc-snippets/scripts/license_detect.py` — detect-only (writes `<root>/license.json`), or enrich JSONL with `license`, `license_url`, `restricted`; options: `--only-if-unknown`, `--fail-on-restricted`, `--validate`.
+- Auto: Synthetic MIT and GPL-3 repos detected correctly (MIT unrestricted; GPL-3 restricted). Enrichment preserves schema validity.
 
 **B7. Provenance recorder**
 - Deliverables: Attach `{repo, commit, path}` to every snippet; compute stable `id` = hash(repo+commit+path+span).

@@ -87,3 +87,13 @@ Step B5 — Dependency analysis (static)
 - CLI: `krpc-snippets/scripts/deps_analyze_repo.py`
   - Enrich existing JSONL: `uv --directory . run python krpc-snippets/scripts/deps_analyze_repo.py --root <repo> --snippets <snippets.jsonl> --out <snippets_with_deps.jsonl> --validate`
   - Or extract then enrich: `uv --directory . run python krpc-snippets/scripts/deps_analyze_repo.py --root <repo> --extract --out <snippets_with_deps.jsonl>`
+
+Step B6 — License detection and enrichment
+- Module: `krpc_snippets/governance/license.py`
+  - Detects repo license via LICENSE file (SPDX or heuristic phrases) or SPDX headers in file tops
+  - Returns SPDX id, canonical URL, and `restricted` flag (true for GPL/AGPL/LGPL families)
+  - Enrichment helper to fill `license`, `license_url`, and `restricted` in snippet records
+- CLI: `krpc-snippets/scripts/license_detect.py`
+  - Detect only: `uv --directory . run python krpc-snippets/scripts/license_detect.py --root <repo> --write-summary`
+  - Enrich JSONL: `uv --directory . run python krpc-snippets/scripts/license_detect.py --root <repo> --snippets <in.jsonl> --out <out.jsonl> --only-if-unknown --validate`
+  - Policy: use `--fail-on-restricted` to exit non-zero when license is GPL-family
