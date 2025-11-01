@@ -32,6 +32,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--exclude-restricted", action="store_true")
     p.add_argument("--model", default=None, help="Embedding model for query text")
     p.add_argument("--mock", action="store_true", help="Use mock embedding for query")
+    # Reranker options
+    p.add_argument("--rerank", action="store_true")
+    p.add_argument("--beta-rerank", type=float, default=0.7)
+    p.add_argument("--top-m", type=int, default=20)
+    p.add_argument("--rerank-model", default="gpt-4o-mini")
+    p.add_argument("--mock-rerank", action="store_true")
 
     args = p.parse_args(argv)
     idx = load_keyword_index(Path(args.index))
@@ -55,6 +61,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         mock_query_embed=bool(args.mock),
         embed_model=args.model,
     )
+    # Optional rerank
+    if args.rerank:
+        from krpc_snippets.search.rerank import RerankConfig, rerank_results
+        cfg = RerankConfig(
+            model=args.rerank_model,
+            top_m=int(args.top_m),
+            beta_rerank=float(args.beta_rerank),
+            mock=bool(args.mock_rerank),
+        )
+        res = rerank_results(args.query, res, cfg)[: int(args.k)]
+
     for rank, row in enumerate(res, start=1):
         row_out = dict(row)
         row_out["rank"] = rank
@@ -64,4 +81,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

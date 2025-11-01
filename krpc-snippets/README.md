@@ -142,3 +142,10 @@ Step C4 — Hybrid retrieval (keyword + vectors)
   - Loads keyword index + embedding store; embeds query text (OpenAI or mock); cos-sim vector search; fuses scores (alpha weights)
 - CLI: `krpc-snippets/scripts/search_hybrid.py`
   - Example: `uv --directory . run python krpc-snippets/scripts/search_hybrid.py --query "NavHelper" --index krpc-snippets/data/keyword_index.json --embeddings-jsonl krpc-snippets/data/embeddings.jsonl --k 5 --alpha-keyword 0.5 --alpha-vector 0.5 --mock`
+
+Step C5 — Reranker (optional)
+- Module: `krpc_snippets/search/rerank.py`
+  - Reranks Top‑M hybrid candidates using an LLM (OpenAI) or mock heuristic; caches results per query+candidate set
+  - Final score = beta_rerank * rerank_score + (1 - beta_rerank) * hybrid_fused
+- CLI (extended): `krpc-snippets/scripts/search_hybrid.py`
+  - `--rerank --beta-rerank 0.7 --top-m 20 --rerank-model gpt-4o-mini` (add `--mock-rerank` for offline)

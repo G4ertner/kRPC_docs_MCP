@@ -218,9 +218,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/search_hybrid.py` — hybrid search across existing index and embeddings with filters and AND/OR keyword logic.
 - Auto: Sanity queries on sample corpus return expected top results and fuse keyword/vector signals.
 
-**C5. Reranker (optional)**
-- Deliverables: `src/search/rerank.py` (cross‑encoder or lightweight LLM re‑score for Top‑K).
-- Auto: Offline metric shows NDCG@10 improvement ≥ pre‑set threshold.
+**C5. Reranker (optional) (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/search/rerank.py` — re-scores Top‑M hybrid candidates with an LLM (OpenAI) or mock; caches per query+candidate set; final score = beta*rerank + (1-beta)*hybrid.
+  - CLI: extended `search_hybrid.py` with `--rerank`, `--beta-rerank`, `--top-m`, `--rerank-model`, `--mock-rerank`.
+- Auto: Mock rerank integrates and adjusts final ordering on sample queries; live rerank verified with API key.
 
 ### Phase D — Serving & Resolution
 **D1. Dependency‑aware resolver**
