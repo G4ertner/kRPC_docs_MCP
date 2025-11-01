@@ -161,6 +161,7 @@ Notes
 - Rendezvous & docking: `resource://playbooks/rendezvous-docking`
 - Vessel blueprint usage: `resource://playbooks/vessel-blueprint-usage`
 - Launch → Ascent → Circularize: `resource://playbooks/launch-ascent-circularize`
+- State checkpoint & rollback: `resource://playbooks/state-checkpoint-rollback`
 - Snippets tools cheatsheet: `resource://snippets/usage`
 
 Use these playbooks to structure your plan and tool calls before generating scripts.
@@ -220,3 +221,6 @@ next_step: begin horizontal acceleration to build orbital velocity
 ```
 
 ---
+- Checkpointing & reset (tools)
+- Use `save_llm_checkpoint(tag=...)` to create unique, namespaced saves. Load with `load_llm_checkpoint(...)` — the game auto‑pauses after load so you can inspect state (execute unpauses on start).
+- For quick recovery use `revert_to_launch()`; prefer named LLM saves over quicksave/quickload to avoid overwriting a player’s quicksave.

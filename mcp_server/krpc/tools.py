@@ -4,6 +4,9 @@ from .client import connect_to_game, KRPCConnectionError
 from ..server import mcp
 from . import readers
 import json
+import datetime as _dt
+import math
+import secrets
 
 
 @mcp.tool()
@@ -213,6 +216,161 @@ def get_status_overview(address: str, rpc_port: int = 50000, stream_port: int = 
     }
     return json.dumps(out)
 
+
+# Reset / revert helpers
+
+@mcp.tool()
+def revert_to_launch(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Revert the current flight to launch (KSP's Revert to Launch).
+
+    When to use:
+      - Reset a mission after a failed ascent or test, returning the rocket to the launch pad.
+
+    Notes:
+      - This calls SpaceCenter.revert_to_launch(). If revert is disabled or not available in the current scene,
+        returns a message indicating it cannot revert.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    sc = conn.space_center
+    try:
+        can = getattr(sc, 'can_revert_to_launch', True)
+        if callable(can):
+            # Older bindings may expose as a method
+            can = bool(can())
+        if can is False:
+            return "Cannot revert to launch in the current state (disabled or unavailable)."
+    except Exception:
+        # Proceed best-effort
+        pass
+    try:
+        sc.revert_to_launch()
+        return "Reverted to launch."
+    except Exception as e:
+        return f"Failed to revert to launch: {e}"
+
+
+@mcp.tool()
+def save_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, tag: str | None = None, prefix: str = "LLM") -> str:
+    """
+    Save a game checkpoint under a unique LLM-namespaced name.
+
+    Behavior:
+      - Generates a unique save name like: "<prefix>_YYYYmmddTHHMMSSZ_<id>".
+      - Uses SpaceCenter.save(name) instead of quicksave() to avoid overwriting the user's quicksave.
+
+    Args:
+      tag: Optional label included in the generated name for readability.
+      prefix: Namespace prefix (default "LLM").
+
+    Returns JSON: { ok, save_name, note? }.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    sc = conn.space_center
+    ts = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    rid = secrets.token_hex(2)  # small suffix to reduce collisions
+    base = f"{prefix}_{ts}"
+    if tag:
+        base += f"_{tag}"
+    save_name = f"{base}_{rid}"
+    try:
+        sc.save(save_name)
+        return json.dumps({"ok": True, "save_name": save_name})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+@mcp.tool()
+def load_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, save_name: str = "", require_llm_prefix: bool = True, pause_after: bool = True) -> str:
+    """
+    Load a previously saved checkpoint by name using SpaceCenter.load(name).
+
+    Safeguards:
+      - By default, only loads names starting with "LLM_" (set require_llm_prefix=false to override).
+
+    Returns JSON: { ok, loaded?: save_name, error? }.
+    """
+    if not save_name:
+        return json.dumps({"ok": False, "error": "Provide save_name"})
+    if require_llm_prefix and not save_name.startswith("LLM_"):
+        return json.dumps({"ok": False, "error": "Refusing to load non-LLM save (set require_llm_prefix=false to override)"})
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    sc = conn.space_center
+    try:
+        sc.load(save_name)
+        # Best effort: pause after loading so the agent can review state
+        if pause_after:
+            _best_effort_pause(conn)
+        return json.dumps({"ok": True, "loaded": save_name})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
+@mcp.tool()
+def quicksave(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Save a quicksave (SpaceCenter.quicksave()).
+
+    Notes:
+      - This overwrites the game's single quicksave slot. Prefer save_llm_checkpoint to create namespaced saves.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    try:
+        conn.space_center.quicksave()
+        return "Quicksaved."
+    except Exception as e:
+        return f"Failed to quicksave: {e}"
+
+
+@mcp.tool()
+def quickload(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, pause_after: bool = True) -> str:
+    """
+    Load from the quicksave slot (SpaceCenter.quickload()).
+
+    Notes:
+      - Prefer load_llm_checkpoint for named saves to avoid conflict with a player's quicksave.
+    """
+    conn = _connect(address, rpc_port, stream_port, name, timeout)
+    try:
+        conn.space_center.quickload()
+        if pause_after:
+            _best_effort_pause(conn)
+        return "Quickloaded."
+    except Exception as e:
+        return f"Failed to quickload: {e}"
+
+
+# Internal: pause helper mirrored from executors.runner
+def _best_effort_pause(conn):
+    # Preferred API: KRPC.paused (read/write)
+    try:
+        cur = bool(conn.krpc.paused)
+        if not cur:
+            conn.krpc.paused = True
+        return True
+    except Exception:
+        pass
+    # Fallbacks on SpaceCenter
+    try:
+        sc = conn.space_center
+    except Exception:
+        return None
+    for attr in ("set_pause", "set_paused", "pause"):
+        try:
+            fn = getattr(sc, attr, None)
+            if callable(fn):
+                fn(True)
+                return True
+        except Exception:
+            continue
+    for attr in ("paused", "is_paused"):
+        try:
+            if hasattr(sc, attr):
+                setattr(sc, attr, True)
+                return True
+        except Exception:
+            continue
+    return None
 
 # Medium batch 1: engines, resources, surface
 

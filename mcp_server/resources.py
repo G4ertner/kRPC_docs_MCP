@@ -3,7 +3,7 @@ from __future__ import annotations
 from .server import mcp
 
 
-PLAYBOOK_TEXT = """
+PLAYBOOK_TEXT = '''
 Maneuver Node Playbook
 
 1) Read status
@@ -60,7 +60,7 @@ Snippets usage
 - Search: snippets_search({"query": "circularize orbit", "k": 5, "mode": "hybrid", "rerank": true})
 - Inspect: snippets_get(id, include_code=false); Resolve: snippets_resolve({"id": "<id>"})
 - Filter by category (function/class/method) or use exclude_restricted=true per policy.
-"""
+'''
 
 
 @mcp.resource("resource://playbooks/maneuver-node")
@@ -101,7 +101,7 @@ def get_blueprint_usage_playbook() -> str:
 
 # Additional playbooks
 
-FLIGHT_CONTROL_PLAYBOOK = """
+FLIGHT_CONTROL_PLAYBOOK = '''
 Flight Control Playbook
 
 1) Establish control state
@@ -143,7 +143,7 @@ Snippets usage
 - Search (PID hover, ascent control, pitch program): snippets_search({"query": "ascent autopilot PID", "k": 10, "mode": "hybrid", "rerank": true})
 - Inspect with snippets_get; resolve focused helpers with snippets_resolve to avoid bloat.
 - Filter by category="function" or exclude_restricted=true per policy.
-"""
+'''
 
 
 @mcp.resource("resource://playbooks/flight-control")
@@ -151,7 +151,7 @@ def get_flight_control_playbook() -> str:
     return FLIGHT_CONTROL_PLAYBOOK
 
 
-RENDEZVOUS_PLAYBOOK = """
+RENDEZVOUS_PLAYBOOK = '''
 Rendezvous & Docking Playbook
 
 1) Align planes
@@ -196,7 +196,7 @@ Snippets usage
 - Search rendezvous helpers: snippets_search({"query": "rendezvous docking approach", "k": 10, "mode": "hybrid"})
 - Resolve utilities for vector math/approach throttling; prefer minimal functions.
 - Use exclude_restricted=true when license policy requires.
-"""
+'''
 
 
 @mcp.resource("resource://playbooks/rendezvous-docking")
@@ -204,7 +204,7 @@ def get_rendezvous_playbook() -> str:
     return RENDEZVOUS_PLAYBOOK
 
 
-LAUNCH_ASCENT_CIRC_PLAYBOOK = """
+LAUNCH_ASCENT_CIRC_PLAYBOOK = '''
 Launch, Ascent, Circularize Playbook
 
 Purpose: Safely launch to space, perform a gravity turn, and circularize at apoapsis into a stable LKO.
@@ -306,9 +306,55 @@ Snippets usage (search/resolve)
 Notes
 - Respect license policy: pass exclude_restricted=true in search if required.
 - MechJeb integration: when available, use its kRPC service (ascent_autopilot, maneuver planner) for higher-level automation.
-"""
+'''
 
 
 @mcp.resource("resource://playbooks/launch-ascent-circularize")
 def get_launch_ascent_circ_playbook() -> str:
     return LAUNCH_ASCENT_CIRC_PLAYBOOK
+
+
+STATE_CHECKPOINT_PLAYBOOK = '''
+State Checkpoint & Rollback Playbook
+
+Purpose: Create safe restore points during missions and reliably roll back when needed. This complements the execute pipeline (unpause at start, pause at end).
+
+When to checkpoint
+- Before irreversible actions: liftoff, circularization, transfer ejection, capture, de‑orbit/landing.
+- Before complex sequences or when testing new logic.
+
+Naming & policy
+- Use save_llm_checkpoint to create unique, namespaced saves (LLM_YYYYmmddTHHMMSSZ_<tag>_<id>), so gamer saves aren’t touched.
+- Only load LLM_ saves (default safeguard); avoid quicksave/quickload unless you know you want to override the single quickslot.
+
+Core tools
+- Save: save_llm_checkpoint({"address":"<IP>", "tag":"pre_circ"}) → { ok, save_name }
+- Load (auto‑pause): load_llm_checkpoint({"address":"<IP>", "save_name":"LLM_..."})
+  • After load, the game is paused; UT won’t advance until you resume. The execute_script tool unpauses on start and pauses again on end.
+- Quick save/load (fallback): quicksave({"address":"<IP>"}), quickload({"address":"<IP>"})
+  • Caution: these operate on the single quicksave slot; prefer named LLM checkpoints.
+- Revert flight to pad: revert_to_launch({"address":"<IP>"})
+  • Use to restart quickly after a failed attempt.
+
+Reference sequence
+1) Snapshot state:
+   - get_status_overview({"address":"<IP>"})
+   - export_blueprint_diagram({"address":"<IP>", "format":"svg"})
+2) Save checkpoint:
+   - save_llm_checkpoint({"address":"<IP>", "tag":"pre_circ"}) → record save_name
+3) Proceed with operations or execute_script (auto‑unpause on start).
+4) If results are bad, load back:
+   - load_llm_checkpoint({"address":"<IP>", "save_name":"LLM_..."})  # auto‑pause after load
+   - Verify pause: get_time_status — UT should not advance while paused
+   - Resume with execute_script (which unpauses) or continue with interactive steps
+
+Tips
+- Use descriptive tags: pre_ascent, pre_circ, pre_transfer, pre_capture, pre_deorbit.
+- Keep a small chain of recent checkpoints so you can step back more than one phase.
+- For quick resets from flight tests, revert_to_launch is fastest.
+'''
+
+
+@mcp.resource("resource://playbooks/state-checkpoint-rollback")
+def get_state_checkpoint_playbook() -> str:
+    return STATE_CHECKPOINT_PLAYBOOK
