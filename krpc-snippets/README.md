@@ -98,6 +98,14 @@ Step B6 — License detection and enrichment
   - Enrich JSONL: `uv --directory . run python krpc-snippets/scripts/license_detect.py --root <repo> --snippets <in.jsonl> --out <out.jsonl> --only-if-unknown --validate`
   - Policy: use `--fail-on-restricted` to exit non-zero when license is GPL-family
 
+Phase E — Governance, Evaluation, CI
+
+Step E1 — License auditor & policy
+- Script: `krpc-snippets/scripts/audit_licenses.py`
+  - Audit: `uv --directory . run python krpc-snippets/scripts/audit_licenses.py --snippets krpc-snippets/data/snippets_enriched.jsonl --report krpc-snippets/data/license_audit.json`
+  - Fail gates: add `--fail-on-unknown`, `--fail-on-restricted`, or `--fail-on-mismatch`
+- Policy doc: `krpc-snippets/docs/license_policy.md`
+
 Step B7 — Provenance recorder & auditor
 - Module: `krpc_snippets/ingest/provenance.py`
   - Fills/normalizes `repo`, `commit`, and `path` (repo-relative POSIX), using `fetch.json` if present

@@ -240,9 +240,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
 - Auto: Endpoint tests; OpenAPI schema validation.
 
 ### Phase E — Governance, Evaluation, CI
-**E1. Licence auditor & policy**
-- Deliverables: `scripts/audit_licenses.py` → report (counts by licence, restricted ids). Policy doc for reuse guidance.
-- Auto: CI job fails if restricted snippets lack `restricted=True` or missing provenance.
+**E1. Licence auditor & policy (implemented)**
+- Deliverables (as implemented):
+  - Script: `krpc-snippets/scripts/audit_licenses.py` — audits JSONL, prints JSON summary, optional detailed report, and supports fail gates: `--fail-on-unknown`, `--fail-on-restricted`, `--fail-on-mismatch`.
+  - Policy doc: `krpc-snippets/docs/license_policy.md` — guidance on detection sources, restricted families, and CI usage.
+- Auto: Audit on sample snippets shows all MIT (no restricted/unknown); ready to wire into CI fail gates.
 
 **E2. Query benchmark & eval harness**
 - Deliverables: `eval/queries.jsonl` (seed queries + expected ids), `scripts/eval_retrieval.py` computing Top‑K accuracy & NDCG.

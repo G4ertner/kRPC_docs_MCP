@@ -1,0 +1,14 @@
+{
+  "total": 4,
+  "by_license": {
+    "MIT": 4
+  },
+  "restricted_count": 0,
+  "unknown_count": 0,
+  "mismatched_restricted": 0,
+  "missing_provenance": 0,
+  "restricted_ids": [],
+  "unknown_ids": [],
+  "mismatched_ids": [],
+  "missing_provenance_ids": []
+}
