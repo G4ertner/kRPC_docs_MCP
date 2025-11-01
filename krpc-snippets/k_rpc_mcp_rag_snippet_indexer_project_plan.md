@@ -159,9 +159,11 @@ Each step includes **Deliverables**, **Automated Tests** (scriptable), and **Man
   - CLI: `krpc-snippets/scripts/walk_repo_cli.py` — flags: `--root`, `--use-git`, `--max-size`, `--include`, `--exclude-dir`, `--exclude`, `--count`, `--head`.
 - Auto: Synthetic local repo tree verified — default excludes applied, repo-level ignore patterns respected, deterministic ordering.
 
-**B3. Python AST parser**
-- Deliverables: `src/ingest/python_ast.py` extracting top‑level functions/classes, docstrings, leading comments, constant config blocks.
-- Auto: Parses fixtures; extracts function boundaries correctly; preserves line numbers.
+**B3. Python AST parser (implemented)**
+- Deliverables (as implemented):
+  - Module: `krpc_snippets/ingest/python_ast.py` — parses modules via `ast` + `tokenize` (encoding-aware); extracts top‑level functions/classes (with spans, docstrings, leading comments, decorators, params, returns), class methods, imports/from_imports, and an initial top-level constants block (UPPER_CASE assignments before first def/class).
+  - CLI: `krpc-snippets/scripts/ast_parse_cli.py` — `--path`, `--json` (with `--no-code`), `--summary`, `--functions`, `--classes`, `--consts`.
+- Auto: Sanity file under `krpc-snippets/data/test_repo_fs/a/sample.py` verified; line spans and names extracted correctly; const block detected.
 
 **B4. Snippet extraction**
 - Deliverables: `src/ingest/extract_snippets.py` turning AST nodes into snippet records per schema.
