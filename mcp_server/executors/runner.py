@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import signal
 import sys
 import traceback
 import time as _time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..krpc.client import connect_to_game
 from .injectors import build_globals, restore_after_exec
@@ -107,6 +108,35 @@ def _load_config() -> Dict[str, Any]:
     return cfg
 
 
+_CONN: Optional[object] = None
+
+
+def _signal_handler(signum, frame):
+    try:
+        # Best-effort pause when interrupted (Ctrl-C, tool cancel, supervisor stop)
+        if _CONN is not None:
+            try:
+                _try_pause(_CONN)
+            except Exception:
+                pass
+        meta = {
+            "ok": False,
+            "paused": (_get_paused(_CONN) if _CONN is not None else None),
+            "unpaused": None,
+            "exec_time_s": None,
+        }
+        # Ensure meta line is printed so parent can parse a graceful end
+        print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+    finally:
+        # 128 + signal number is conventional exit code for signals
+        code = 128 + int(signum or 0)
+        try:
+            sys.stdout.flush(); sys.stderr.flush()
+        except Exception:
+            pass
+        os._exit(code)
+
+
 def main() -> None:
     cfg = _load_config()
     code_path = Path(cfg["code_path"]).resolve()
@@ -133,6 +163,16 @@ def main() -> None:
             name=name,
             timeout=(min(timeout_sec, 10.0) if isinstance(timeout_sec, (int, float)) and timeout_sec > 0 else 10.0),
         )
+        # Expose to signal handler
+        global _CONN
+        _CONN = conn
+        # Install signal handlers to pause on external interrupts
+        for sig in (getattr(signal, 'SIGINT', None), getattr(signal, 'SIGTERM', None)):
+            if sig is not None:
+                try:
+                    signal.signal(sig, _signal_handler)
+                except Exception:
+                    pass
     except Exception:
         # Print traceback to stderr for parent to parse
         traceback.print_exc()
@@ -167,10 +207,16 @@ def main() -> None:
     try:
         glb, cleanup = build_globals(conn, timeout_sec=timeout_sec, allow_imports=allow_imports)
     except Exception:
+        # Best-effort: pause if requested and we have a live connection
+        if pause_on_end:
+            try:
+                _try_pause(conn)
+            except Exception:
+                pass
         traceback.print_exc()
         meta = {
             "ok": False,
-            "paused": None,
+            "paused": _get_paused(conn),
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
@@ -185,10 +231,16 @@ def main() -> None:
     try:
         code = code_path.read_text(encoding="utf-8")
     except Exception:
+        # Best-effort: pause if requested and we have a live connection
+        if pause_on_end:
+            try:
+                _try_pause(conn)
+            except Exception:
+                pass
         traceback.print_exc()
         meta = {
             "ok": False,
-            "paused": None,
+            "paused": _get_paused(conn),
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
         }
@@ -207,17 +259,8 @@ def main() -> None:
         traceback.print_exc()
         ok = False
     finally:
-        # Decide if we should pause at the end. If the vessel remained in pre-launch
-        # throughout, skip pausing to avoid popping the pause menu before liftoff.
-        should_pause = bool(pause_on_end)
-        if should_pause:
-            try:
-                v1 = getattr(conn.space_center, "active_vessel", None)
-                if initial_prelaunch is True and _is_prelaunch(v1) is True:
-                    should_pause = False
-            except Exception:
-                pass
-        if should_pause:
+        # Always attempt to pause at the end when requested.
+        if bool(pause_on_end):
             try:
                 paused = _try_pause(conn)
             except Exception:
