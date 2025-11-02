@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..krpc.client import connect_to_game
+from ..krpc import readers
 from .injectors import build_globals, restore_after_exec
 from .parsers import EXEC_META_PREFIX
 
@@ -114,7 +115,12 @@ _CONN: Optional[object] = None
 def _signal_handler(signum, frame):
     try:
         # Best-effort pause when interrupted (Ctrl-C, tool cancel, supervisor stop)
+        pre_pause_flight = None
         if _CONN is not None:
+            try:
+                pre_pause_flight = readers.flight_snapshot(_CONN)
+            except Exception:
+                pre_pause_flight = None
             try:
                 _try_pause(_CONN)
             except Exception:
@@ -124,6 +130,7 @@ def _signal_handler(signum, frame):
             "paused": (_get_paused(_CONN) if _CONN is not None else None),
             "unpaused": None,
             "exec_time_s": None,
+            "pre_pause_flight": pre_pause_flight,
         }
         # Ensure meta line is printed so parent can parse a graceful end
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
@@ -208,7 +215,12 @@ def main() -> None:
         glb, cleanup = build_globals(conn, timeout_sec=timeout_sec, allow_imports=allow_imports)
     except Exception:
         # Best-effort: pause if requested and we have a live connection
+        pre_pause_flight = None
         if pause_on_end:
+            try:
+                pre_pause_flight = readers.flight_snapshot(conn)
+            except Exception:
+                pre_pause_flight = None
             try:
                 _try_pause(conn)
             except Exception:
@@ -219,6 +231,7 @@ def main() -> None:
             "paused": _get_paused(conn),
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
+            "pre_pause_flight": pre_pause_flight,
         }
         try:
             sys.stdout.flush()
@@ -232,7 +245,12 @@ def main() -> None:
         code = code_path.read_text(encoding="utf-8")
     except Exception:
         # Best-effort: pause if requested and we have a live connection
+        pre_pause_flight = None
         if pause_on_end:
+            try:
+                pre_pause_flight = readers.flight_snapshot(conn)
+            except Exception:
+                pre_pause_flight = None
             try:
                 _try_pause(conn)
             except Exception:
@@ -243,6 +261,7 @@ def main() -> None:
             "paused": _get_paused(conn),
             "unpaused": unpaused,
             "exec_time_s": _time.monotonic() - exec_start,
+            "pre_pause_flight": pre_pause_flight,
         }
         try:
             sys.stdout.flush()
@@ -261,6 +280,11 @@ def main() -> None:
     finally:
         # Always attempt to pause at the end when requested.
         if bool(pause_on_end):
+            pre_pause_flight = None
+            try:
+                pre_pause_flight = readers.flight_snapshot(conn)
+            except Exception:
+                pre_pause_flight = None
             try:
                 paused = _try_pause(conn)
             except Exception:
@@ -279,6 +303,7 @@ def main() -> None:
         "paused": paused,
         "unpaused": unpaused,
         "exec_time_s": _time.monotonic() - exec_start,
+        "pre_pause_flight": (locals().get('pre_pause_flight', None)),
     }
     print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
     sys.exit(0 if ok else 1)

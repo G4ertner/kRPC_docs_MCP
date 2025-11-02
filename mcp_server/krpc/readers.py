@@ -80,21 +80,31 @@ def environment_info(conn) -> Dict[str, Any]:
 
 def flight_snapshot(conn) -> Dict[str, Any]:
     v = conn.space_center.active_vessel
-    f = v.flight()
+    # Use a consistent, meaningful reference frame for velocities: surface rotating frame
+    try:
+        f_surf = v.flight(v.orbit.body.reference_frame)
+    except Exception:
+        f_surf = v.flight()
     data = {
-        "altitude_sea_level_m": getattr(f, "mean_altitude", None),
-        "altitude_terrain_m": getattr(f, "surface_altitude", None),
-        "vertical_speed_m_s": getattr(f, "vertical_speed", None),
-        "speed_surface_m_s": getattr(f, "speed", None),
-        "speed_horizontal_m_s": getattr(f, "horizontal_speed", None),
-        "dynamic_pressure_pa": getattr(f, "dynamic_pressure", None),
-        "mach": getattr(f, "mach", None),
-        "g_force": getattr(f, "g_force", None),
-        "angle_of_attack_deg": getattr(f, "angle_of_attack", None),
-        "pitch_deg": getattr(f, "pitch", None),
-        "roll_deg": getattr(f, "roll", None),
-        "heading_deg": getattr(f, "heading", None),
+        "altitude_sea_level_m": getattr(f_surf, "mean_altitude", None),
+        "altitude_terrain_m": getattr(f_surf, "surface_altitude", None),
+        "vertical_speed_m_s": getattr(f_surf, "vertical_speed", None),
+        "speed_surface_m_s": getattr(f_surf, "speed", None),
+        "speed_horizontal_m_s": getattr(f_surf, "horizontal_speed", None),
+        "dynamic_pressure_pa": getattr(f_surf, "dynamic_pressure", None),
+        "mach": getattr(f_surf, "mach", None),
+        "g_force": getattr(f_surf, "g_force", None),
+        "angle_of_attack_deg": getattr(f_surf, "angle_of_attack", None),
+        "pitch_deg": getattr(f_surf, "pitch", None),
+        "roll_deg": getattr(f_surf, "roll", None),
+        "heading_deg": getattr(f_surf, "heading", None),
     }
+    # Also provide an orbital/non-rotating frame speed for completeness
+    try:
+        f_orb = v.flight(v.orbit.body.non_rotating_reference_frame)
+        data["speed_orbital_m_s"] = getattr(f_orb, "speed", None)
+    except Exception:
+        pass
     return data
 
 

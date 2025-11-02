@@ -12,7 +12,8 @@ from typing import Any, Dict
 
 from .server import mcp
 
-from .krpc.client import KRPCConnectionError  # re-exported in docs
+from .krpc.client import KRPCConnectionError, connect_to_game  # re-exported in docs
+from .krpc import readers
 from .executors.parsers import split_stdout_and_meta, parse_summary, extract_error_from_stderr
 
 
@@ -130,6 +131,45 @@ def execute_script(
                 proc.kill()
             except Exception:
                 pass
+            # Attempt to collect best-effort diagnostics from the live game to help the LLM debug timeouts.
+            diagnostics: Dict[str, Any] | None = None
+            try:
+                conn = connect_to_game(
+                    address,
+                    rpc_port=int(rpc_port),
+                    stream_port=int(stream_port),
+                    name=name,
+                    timeout=5.0,
+                )
+                diagnostics = {
+                    "vessel": readers.vessel_info(conn),
+                    "environment": readers.environment_info(conn),
+                    "flight": readers.flight_snapshot(conn),
+                    "orbit": readers.orbit_info(conn),
+                    "time": readers.time_status(conn),
+                    "attitude": readers.attitude_status(conn),
+                    "aero": readers.aero_status(conn),
+                }
+                try:
+                    diagnostics["engines"] = readers.engine_status(conn)
+                except Exception:
+                    pass
+                try:
+                    diagnostics["resources"] = readers.resource_breakdown(conn)
+                except Exception:
+                    pass
+                try:
+                    diagnostics["maneuver_nodes"] = readers.maneuver_nodes_basic(conn)
+                except Exception:
+                    pass
+                # After collecting diagnostics, best-effort pause so the game stops progressing.
+                try:
+                    _best_effort_pause(conn)
+                except Exception:
+                    pass
+            except Exception as e:
+                diagnostics = {"note": f"diagnostics unavailable: {type(e).__name__}"}
+
             return json.dumps({
                 "ok": False,
                 "summary": None,
@@ -139,11 +179,13 @@ def execute_script(
                 "error": {"type": "TimeoutError", "message": "Hard timeout reached"},
                 "paused": None,
                 "timing": {"exec_time_s": (float(hard_timeout_sec) if hard_timeout_sec else None)},
+                "diagnostics": diagnostics,
                 "code_stats": {
                     "line_count": code.count("\n") + 1,
                     "has_imports": bool(re.search(r"^\s*(from|import)\b", code, re.M)),
                 },
             })
+
 
         # Strip internal meta from stdout
         transcript_out, meta = split_stdout_and_meta(out or "")
@@ -166,6 +208,7 @@ def execute_script(
             "paused": (meta.get("paused") if isinstance(meta, dict) else None),
             "unpaused": (meta.get("unpaused") if isinstance(meta, dict) else None),
             "timing": {"exec_time_s": (meta.get("exec_time_s") if isinstance(meta, dict) else None)},
+            "pre_pause_flight": (meta.get("pre_pause_flight") if isinstance(meta, dict) else None),
             "code_stats": {
                 "line_count": code.count("\n") + 1,
                 "has_imports": bool(re.search(r"^\s*(from|import)\b", code, re.M)),
@@ -173,3 +216,34 @@ def execute_script(
         }
 
         return json.dumps(result)
+
+
+def _best_effort_pause(conn):
+    """Internal pause helper, mirrors runner/tool logic."""
+    try:
+        cur = bool(conn.krpc.paused)
+        if not cur:
+            conn.krpc.paused = True
+        return True
+    except Exception:
+        pass
+    try:
+        sc = conn.space_center
+    except Exception:
+        return None
+    for attr in ("set_pause", "set_paused", "pause"):
+        try:
+            fn = getattr(sc, attr, None)
+            if callable(fn):
+                fn(True)
+                return True
+        except Exception:
+            continue
+    for attr in ("paused", "is_paused"):
+        try:
+            if hasattr(sc, attr):
+                setattr(sc, attr, True)
+                return True
+        except Exception:
+            continue
+    return None
