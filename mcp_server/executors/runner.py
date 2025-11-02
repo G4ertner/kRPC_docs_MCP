@@ -162,6 +162,7 @@ def main() -> None:
     unpaused: bool | None = None
     initial_prelaunch: bool | None = None
 
+    conn = None
     try:
         conn = connect_to_game(
             address,
@@ -195,7 +196,7 @@ def main() -> None:
         except Exception:
             pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
-        sys.exit(1)
+        return
 
     # Capture initial state
     try:
@@ -239,7 +240,7 @@ def main() -> None:
         except Exception:
             pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
-        sys.exit(1)
+        return
 
     try:
         code = code_path.read_text(encoding="utf-8")
@@ -269,7 +270,7 @@ def main() -> None:
         except Exception:
             pass
         print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
-        sys.exit(1)
+        return
 
     try:
         exec(compile(code, "<user_code>", "exec"), glb, glb)
@@ -306,7 +307,7 @@ def main() -> None:
         "pre_pause_flight": (locals().get('pre_pause_flight', None)),
     }
     print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
-    sys.exit(0 if ok else 1)
+    return
 
 
 if __name__ == "__main__":

@@ -71,7 +71,13 @@ def get_vessel_info(address: str, rpc_port: int = 50000, stream_port: int = 5000
       JSON string: { name, mass_kg, throttle, situation }
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.vessel_info(conn))
+    try:
+        return json.dumps(readers.vessel_info(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -94,7 +100,13 @@ def get_environment_info(address: str, rpc_port: int = 50000, stream_port: int =
       temperature_k?, atmosphere, atmosphere_depth_m }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.environment_info(conn))
+    try:
+        return json.dumps(readers.environment_info(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -111,7 +123,13 @@ def get_flight_snapshot(address: str, rpc_port: int = 50000, stream_port: int = 
       g_force, angle_of_attack_deg, pitch_deg, roll_deg, heading_deg }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.flight_snapshot(conn))
+    try:
+        return json.dumps(readers.flight_snapshot(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -128,7 +146,13 @@ def get_orbit_info(address: str, rpc_port: int = 50000, stream_port: int = 50001
       argument_of_periapsis_deg, semi_major_axis_m, period_s }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.orbit_info(conn))
+    try:
+        return json.dumps(readers.orbit_info(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -143,7 +167,13 @@ def get_time_status(address: str, rpc_port: int = 50000, stream_port: int = 5000
       JSON: { universal_time_s, mission_time_s }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.time_status(conn))
+    try:
+        return json.dumps(readers.time_status(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -159,7 +189,13 @@ def get_attitude_status(address: str, rpc_port: int = 50000, stream_port: int = 
       autopilot_target_heading, autopilot_target_roll }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.attitude_status(conn))
+    try:
+        return json.dumps(readers.attitude_status(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -174,7 +210,13 @@ def get_aero_status(address: str, rpc_port: int = 50000, stream_port: int = 5000
       JSON: { dynamic_pressure_pa, mach, atmosphere_density_kg_m3, drag?, lift? }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.aero_status(conn))
+    try:
+        return json.dumps(readers.aero_status(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -189,7 +231,13 @@ def list_maneuver_nodes(address: str, rpc_port: int = 50000, stream_port: int = 
       JSON array: { ut, time_to_node_s, delta_v_m_s }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.maneuver_nodes_basic(conn))
+    try:
+        return json.dumps(readers.maneuver_nodes_basic(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -204,17 +252,23 @@ def get_status_overview(address: str, rpc_port: int = 50000, stream_port: int = 
       JSON: { vessel, environment, flight, orbit, time, attitude, aero, maneuver_nodes }.
     """
     conn = _connect(address, rpc_port, stream_port, name, timeout)
-    out = {
-        "vessel": readers.vessel_info(conn),
-        "environment": readers.environment_info(conn),
-        "flight": readers.flight_snapshot(conn),
-        "orbit": readers.orbit_info(conn),
-        "time": readers.time_status(conn),
-        "attitude": readers.attitude_status(conn),
-        "aero": readers.aero_status(conn),
-        "maneuver_nodes": readers.maneuver_nodes_basic(conn),
-    }
-    return json.dumps(out)
+    try:
+        out = {
+            "vessel": readers.vessel_info(conn),
+            "environment": readers.environment_info(conn),
+            "flight": readers.flight_snapshot(conn),
+            "orbit": readers.orbit_info(conn),
+            "time": readers.time_status(conn),
+            "attitude": readers.attitude_status(conn),
+            "aero": readers.aero_status(conn),
+            "maneuver_nodes": readers.maneuver_nodes_basic(conn),
+        }
+        return json.dumps(out)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # Reset / revert helpers
@@ -236,18 +290,18 @@ def revert_to_launch(address: str, rpc_port: int = 50000, stream_port: int = 500
     try:
         can = getattr(sc, 'can_revert_to_launch', True)
         if callable(can):
-            # Older bindings may expose as a method
             can = bool(can())
         if can is False:
             return "Cannot revert to launch in the current state (disabled or unavailable)."
-    except Exception:
-        # Proceed best-effort
-        pass
-    try:
         sc.revert_to_launch()
         return "Reverted to launch."
     except Exception as e:
         return f"Failed to revert to launch: {e}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -278,6 +332,11 @@ def save_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 
         return json.dumps({"ok": True, "save_name": save_name})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -298,12 +357,16 @@ def load_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 
     sc = conn.space_center
     try:
         sc.load(save_name)
-        # Best effort: pause after loading so the agent can review state
         if pause_after:
             _best_effort_pause(conn)
         return json.dumps({"ok": True, "loaded": save_name})
     except Exception as e:
         return json.dumps({"ok": False, "error": str(e)})
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -320,6 +383,11 @@ def quicksave(address: str, rpc_port: int = 50000, stream_port: int = 50001, nam
         return "Quicksaved."
     except Exception as e:
         return f"Failed to quicksave: {e}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @mcp.tool()
@@ -338,6 +406,11 @@ def quickload(address: str, rpc_port: int = 50000, stream_port: int = 50001, nam
         return "Quickloaded."
     except Exception as e:
         return f"Failed to quickload: {e}"
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # Internal: pause helper mirrored from executors.runner

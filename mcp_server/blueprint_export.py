@@ -209,4 +209,10 @@ def export_blueprint_diagram(
         else:
             result["note"] = "PNG export requires Pillow. Install with 'uv pip install pillow' or add extras."
 
-    return json.dumps(result)
+    try:
+        return json.dumps(result)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
