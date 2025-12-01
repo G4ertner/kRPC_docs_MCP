@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_utils.client import connect_to_game
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 _LATEST_BLUEPRINT_JSON: str | None = None
 _LAST_SVG: str | None = None
@@ -51,7 +52,7 @@ def get_last_png() -> str:
 
 
 def export_blueprint_diagram(
-    address: str,
+    address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
     stream_port: int = 50001,
     name: str | None = None,

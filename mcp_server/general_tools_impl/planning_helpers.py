@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def compute_burn_time(address: str, dv_m_s: float, environment: str = "current", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_burn_time(address: str = DEFAULT_KRPC_ADDRESS, dv_m_s: float | None = None, environment: str = "current", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Estimate burn time for a given delta-v using current (or specified) thrust and Isp.
 
@@ -20,6 +21,8 @@ def compute_burn_time(address: str, dv_m_s: float, environment: str = "current",
     Returns:
       JSON with mass, thrust, Isp, burn_time_simple_s and burn_time_tsiolkovsky_s.
     """
+    if dv_m_s is None:
+        raise ValueError("dv_m_s is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     env = (environment or "current").lower()
     if env not in ("current", "sea_level", "vacuum"):
@@ -33,7 +36,7 @@ def compute_burn_time(address: str, dv_m_s: float, environment: str = "current",
             pass
 
 
-def compute_circularize_node(address: str, at: str = "apoapsis", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_circularize_node(address: str = DEFAULT_KRPC_ADDRESS, at: str = "apoapsis", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Propose a circularization node at Ap or Pe.
 
@@ -56,7 +59,7 @@ def compute_circularize_node(address: str, at: str = "apoapsis", rpc_port: int =
             pass
 
 
-def compute_plane_change_nodes(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_plane_change_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Propose plane change burns at next AN/DN relative to target (vessel/body).
 
@@ -75,7 +78,7 @@ def compute_plane_change_nodes(address: str, rpc_port: int = 50000, stream_port:
             pass
 
 
-def compute_raise_lower_node(address: str, kind: str, target_alt_m: float, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_raise_lower_node(address: str = DEFAULT_KRPC_ADDRESS, kind: str | None = None, target_alt_m: float | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Propose a single‑burn node to raise/lower apoapsis or periapsis to target_alt_m.
 
@@ -86,6 +89,10 @@ def compute_raise_lower_node(address: str, kind: str, target_alt_m: float, rpc_p
     Returns:
       Proposal: { ut, prograde, normal=0, radial=0, v_now_m_s, v_target_m_s }.
     """
+    if kind is None:
+        raise ValueError("kind is required")
+    if target_alt_m is None:
+        raise ValueError("target_alt_m is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
         return json.dumps(readers.propose_raise_lower_node(conn, kind=kind, target_alt_m=target_alt_m))
@@ -96,7 +103,7 @@ def compute_raise_lower_node(address: str, kind: str, target_alt_m: float, rpc_p
             pass
 
 
-def compute_rendezvous_phase_node(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_rendezvous_phase_node(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Suggest a phasing orbit to rendezvous with the current target vessel in the same SOI.
 
@@ -116,7 +123,7 @@ def compute_rendezvous_phase_node(address: str, rpc_port: int = 50000, stream_po
             pass
 
 
-def compute_transfer_window_to_body(address: str, body_name: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_transfer_window_to_body(address: str = DEFAULT_KRPC_ADDRESS, body_name: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Compute a Hohmann transfer window to a target body (moon or interplanetary).
 
@@ -126,6 +133,8 @@ def compute_transfer_window_to_body(address: str, body_name: str, rpc_port: int 
     Returns phase_now/required/error, time_to_window_s, ut_window, and transfer time.
     Robust fallbacks infer the star/common parent when parent references are missing.
     """
+    if body_name is None:
+        raise ValueError("body_name is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
         return json.dumps(readers.propose_transfer_window_to_body(conn, target_body_name=body_name))
@@ -136,7 +145,7 @@ def compute_transfer_window_to_body(address: str, body_name: str, rpc_port: int 
             pass
 
 
-def compute_ejection_node_to_body(address: str, body_name: str, parking_alt_m: float, environment: str = "current", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def compute_ejection_node_to_body(address: str = DEFAULT_KRPC_ADDRESS, body_name: str | None = None, parking_alt_m: float | None = None, environment: str = "current", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Coarse ejection burn estimate for an interplanetary transfer to the target body.
 
@@ -151,6 +160,10 @@ def compute_ejection_node_to_body(address: str, body_name: str, parking_alt_m: f
     Returns:
       Proposal at UT window: { ut, prograde, normal=0, radial=0, v_inf_m_s, time_to_window_s }.
     """
+    if body_name is None:
+        raise ValueError("body_name is required")
+    if parking_alt_m is None:
+        raise ValueError("parking_alt_m is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     env = (environment or "current").lower()
     if env not in ("current", "sea_level", "vacuum"):

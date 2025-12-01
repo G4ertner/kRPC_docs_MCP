@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def set_target_body(address: str, body_name: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def set_target_body(address: str = DEFAULT_KRPC_ADDRESS, body_name: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Set the active vessel's target body (also tries SpaceCenter.target_body).
 
@@ -13,6 +14,8 @@ def set_target_body(address: str, body_name: str, rpc_port: int = 50000, stream_
     Returns:
       Human‑readable status string or an error if not found.
     """
+    if body_name is None:
+        raise ValueError("body_name is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     sc = conn.space_center
     v = sc.active_vessel
@@ -39,7 +42,7 @@ def set_target_body(address: str, body_name: str, rpc_port: int = 50000, stream_
             pass
 
 
-def set_target_vessel(address: str, vessel_name: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def set_target_vessel(address: str = DEFAULT_KRPC_ADDRESS, vessel_name: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Set the active vessel's target vessel by name (case‑insensitive). Chooses nearest if multiple.
     Also attempts to set SpaceCenter.target_vessel.
@@ -50,6 +53,8 @@ def set_target_vessel(address: str, vessel_name: str, rpc_port: int = 50000, str
     Returns:
       Human‑readable status string or error if not found.
     """
+    if vessel_name is None:
+        raise ValueError("vessel_name is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     sc = conn.space_center
     v = sc.active_vessel
@@ -84,7 +89,7 @@ def set_target_vessel(address: str, vessel_name: str, rpc_port: int = 50000, str
             pass
 
 
-def clear_target(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def clear_target(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Clear target_docking_port, target_vessel, and target_body if set.
 

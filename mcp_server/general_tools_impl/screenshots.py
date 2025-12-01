@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 _SCREENSHOT_DIR = Path.cwd() / "artifacts" / "screenshots"
 _LATEST_SCREENSHOT_JSON: str | None = None
@@ -54,7 +55,7 @@ def resource_payload_for(filename: str) -> str:
 
 
 def get_screenshot(
-    address: str,
+    address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
     stream_port: int = 50001,
     name: str | None = None,

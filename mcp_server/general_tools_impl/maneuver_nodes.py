@@ -9,9 +9,10 @@ from ..utils.krpc_helpers import (
     best_effort_unpause,
     open_connection,
 )
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def list_maneuver_nodes(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_maneuver_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     List basic maneuver nodes.
 
@@ -31,7 +32,7 @@ def list_maneuver_nodes(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def list_maneuver_nodes_detailed(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_maneuver_nodes_detailed(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Detailed maneuver nodes for the active vessel including vector and simple burn-time estimate.
 
@@ -43,7 +44,7 @@ def list_maneuver_nodes_detailed(address: str, rpc_port: int = 50000, stream_por
     return json.dumps(readers.maneuver_nodes_detailed(conn))
 
 
-def set_maneuver_node(address: str, ut: float, prograde: float = 0.0, normal: float = 0.0, radial: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def set_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, prograde: float = 0.0, normal: float = 0.0, radial: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Create a maneuver node at a specific UT with given vector components.
 
@@ -60,6 +61,8 @@ def set_maneuver_node(address: str, ut: float, prograde: float = 0.0, normal: fl
     Returns:
       JSON echo of the created node parameters.
     """
+    if ut is None:
+        raise ValueError("ut is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     ctrl = conn.space_center.active_vessel.control
     try:
@@ -74,7 +77,7 @@ def set_maneuver_node(address: str, ut: float, prograde: float = 0.0, normal: fl
         return f"Failed to create node: {e}"
 
 
-def update_maneuver_node(address: str, node_index: int = 0, ut: float | None = None, prograde: float | None = None, normal: float | None = None, radial: float | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def update_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, node_index: int = 0, ut: float | None = None, prograde: float | None = None, normal: float | None = None, radial: float | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Edit an existing maneuver node (default: first node).
 
@@ -112,7 +115,7 @@ def update_maneuver_node(address: str, node_index: int = 0, ut: float | None = N
         return f"Failed to update node: {e}"
 
 
-def delete_maneuver_nodes(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def delete_maneuver_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Remove all maneuver nodes for the active vessel.
 
@@ -136,7 +139,7 @@ def delete_maneuver_nodes(address: str, rpc_port: int = 50000, stream_port: int 
         return f"Failed to remove nodes: {e}"
 
 
-def warp_to(address: str, ut: float, lead_time_s: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def warp_to(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, lead_time_s: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Best‑effort warp‑to.
 
@@ -150,6 +153,8 @@ def warp_to(address: str, ut: float, lead_time_s: float = 0.0, rpc_port: int = 5
     Returns:
       Human‑readable status string, or a message if unsupported.
     """
+    if ut is None:
+        raise ValueError("ut is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     paused_before = best_effort_paused_state(conn)
     if paused_before is True:

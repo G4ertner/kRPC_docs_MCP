@@ -5,10 +5,11 @@ import json
 import secrets
 
 from ..utils.krpc_helpers import best_effort_pause, open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 from ..utils.krpc_utils.client import KRPCConnectionError
 
 
-def krpc_get_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def krpc_get_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Connect to a running kRPC server and return its version (and active vessel if available).
 
@@ -50,7 +51,7 @@ def krpc_get_status(address: str, rpc_port: int = 50000, stream_port: int = 5000
             pass
 
 
-def revert_to_launch(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def revert_to_launch(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Revert the current flight to launch (KSP's Revert to Launch).
 
@@ -80,7 +81,7 @@ def revert_to_launch(address: str, rpc_port: int = 50000, stream_port: int = 500
             pass
 
 
-def save_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, tag: str | None = None, prefix: str = "LLM") -> str:
+def save_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, tag: str | None = None, prefix: str = "LLM") -> str:
     """
     Save a game checkpoint under a unique LLM-namespaced name.
 
@@ -114,7 +115,7 @@ def save_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def load_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, save_name: str = "", require_llm_prefix: bool = True, pause_after: bool = True) -> str:
+def load_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, save_name: str = "", require_llm_prefix: bool = True, pause_after: bool = True) -> str:
     """
     Load a previously saved checkpoint by name using SpaceCenter.load(name).
 
@@ -143,7 +144,7 @@ def load_llm_checkpoint(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def quicksave(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def quicksave(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Save a quicksave (SpaceCenter.quicksave()).
 
@@ -163,7 +164,7 @@ def quicksave(address: str, rpc_port: int = 50000, stream_port: int = 50001, nam
             pass
 
 
-def quickload(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, pause_after: bool = True) -> str:
+def quickload(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, pause_after: bool = True) -> str:
     """
     Load from the quicksave slot (SpaceCenter.quickload()).
 

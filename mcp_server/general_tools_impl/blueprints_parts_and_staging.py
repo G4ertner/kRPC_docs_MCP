@@ -5,9 +5,10 @@ import json
 from .blueprints import set_latest_blueprint
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def get_part_tree(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_part_tree(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Hierarchical part tree with staging and module/resource summaries.
 
@@ -30,7 +31,7 @@ def get_part_tree(address: str, rpc_port: int = 50000, stream_port: int = 50001,
             pass
 
 
-def get_vessel_blueprint(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_vessel_blueprint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Idealized vessel blueprint combining meta, stage plan, engines, control capabilities, and part tree.
 
@@ -56,7 +57,7 @@ def get_vessel_blueprint(address: str, rpc_port: int = 50000, stream_port: int =
             pass
 
 
-def get_blueprint_ascii(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_blueprint_ascii(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Compact ASCII schematic/summary of the current vessel by stage.
 
@@ -76,7 +77,7 @@ def get_blueprint_ascii(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def get_stage_plan(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
+def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
     """
     Approximate stock‑like staging plan by grouping decouple‑only stages under the
     preceding engine stage.
@@ -109,7 +110,7 @@ def get_stage_plan(address: str, rpc_port: int = 50000, stream_port: int = 50001
             pass
 
 
-def get_staging_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Approximate per-stage delta‑v and TWR plan using current engine Isp and resource masses.
 

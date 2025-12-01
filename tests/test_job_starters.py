@@ -9,7 +9,8 @@ import pytest
 from mcp_server import executor_tools
 from mcp_server.executor_tools import job_tools
 from mcp_server.executor_tools.job_artifacts import job_artifact_path, job_resource_uri
-from mcp_server.executor_tools.jobs import JobStatus, job_registry
+from mcp_server.executor_tools.jobs import JobRegistry, JobStatus, job_registry
+from mcp_server.executor_impl.core import _resolve_timeouts
 
 
 class DummyConn:
@@ -139,3 +140,16 @@ def test_start_execute_script_job_creates_artifact(monkeypatch, tmp_path: Path):
     assert artifact.exists()
     data = json.loads(artifact.read_text())
     assert data["kind"] == "execute_script"
+
+
+def test_resolve_timeouts_preserves_soft_and_bumps_hard_when_needed():
+    # hard watchdog should trail soft timeout by margin without altering soft
+    soft, hard = _resolve_timeouts(timeout_sec=180.0, hard_timeout_sec=120.0, job_handle=None)
+    assert soft == 180.0
+    assert hard == 190.0
+
+
+def test_transient_stream_error_detects_proactor_noise():
+    jr = JobRegistry(max_workers=1)
+    noisy = "ERROR Exception in callback ProactorBasePipeTransport._call_connection_lost"
+    assert jr._is_transient_stream_error(noisy) is True

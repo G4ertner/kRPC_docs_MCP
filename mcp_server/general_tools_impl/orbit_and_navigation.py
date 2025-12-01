@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def get_orbit_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_orbit_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Orbital elements for the active vessel.
 
@@ -28,7 +29,7 @@ def get_orbit_info(address: str, rpc_port: int = 50000, stream_port: int = 50001
             pass
 
 
-def get_navigation_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_navigation_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Coarse navigation info to the current target (body or vessel).
 
@@ -45,7 +46,7 @@ def get_navigation_info(address: str, rpc_port: int = 50000, stream_port: int = 
     return json.dumps(readers.navigation_info(conn))
 
 
-def get_targeting_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_targeting_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Current target summary across vessel/body/docking targets with relative geometry when available.
 

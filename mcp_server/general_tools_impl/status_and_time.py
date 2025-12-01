@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def get_status_overview(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_status_overview(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Combined snapshot of core vessel/game status in a single call.
 
@@ -36,7 +37,7 @@ def get_status_overview(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def get_vessel_info(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_vessel_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Basic vessel info for the active craft.
 
@@ -63,7 +64,7 @@ def get_vessel_info(address: str, rpc_port: int = 50000, stream_port: int = 5000
             pass
 
 
-def get_time_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_time_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Time context for the current save.
 
@@ -83,7 +84,7 @@ def get_time_status(address: str, rpc_port: int = 50000, stream_port: int = 5000
             pass
 
 
-def set_timewarp_rate(address: str, rate: float, mode: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def set_timewarp_rate(address: str = DEFAULT_KRPC_ADDRESS, rate: float = 1.0, mode: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Adjust the current timewarp rate (and optionally the warp mode).
 

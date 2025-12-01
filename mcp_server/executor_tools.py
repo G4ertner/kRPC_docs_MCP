@@ -14,6 +14,7 @@ from .executor_impl import job_artifacts as _job_artifacts
 from .executor_impl import job_tools as _job_tools
 from .executor_impl import jobs as _jobs
 from .executor_impl import script_jobs as _script_jobs
+from .utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 # Expose implementation modules under the historical mcp_server.executor_tools.*
 job_artifacts = _job_artifacts
@@ -29,7 +30,7 @@ sys.modules[__name__ + ".script_jobs"] = _script_jobs
 @mcp.tool()
 def start_execute_script_job(
     code: str,
-    address: str,
+    address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
     stream_port: int = 50001,
     name: str | None = None,

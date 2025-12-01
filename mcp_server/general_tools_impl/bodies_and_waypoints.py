@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def list_bodies(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_bodies(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     List celestial bodies known to kRPC with key metadata.
 
@@ -26,7 +27,7 @@ def list_bodies(address: str, rpc_port: int = 50000, stream_port: int = 50001, n
             pass
 
 
-def list_waypoints(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_waypoints(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Waypoints known to the waypoint manager, with vessel-relative range/bearing where possible.
 

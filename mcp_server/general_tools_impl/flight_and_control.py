@@ -9,9 +9,10 @@ from ..utils.krpc_helpers import (
     best_effort_unpause,
     open_connection,
 )
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def get_flight_snapshot(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_flight_snapshot(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Flight snapshot for the active vessel.
 
@@ -33,7 +34,7 @@ def get_flight_snapshot(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def get_attitude_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_attitude_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Attitude/control state for the active vessel.
 
@@ -55,7 +56,7 @@ def get_attitude_status(address: str, rpc_port: int = 50000, stream_port: int = 
             pass
 
 
-def get_action_groups_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_action_groups_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Action group toggles.
 
@@ -69,7 +70,7 @@ def get_action_groups_status(address: str, rpc_port: int = 50000, stream_port: i
     return json.dumps(readers.action_groups_status(conn))
 
 
-def get_camera_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_camera_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Active camera parameters when available: mode, pitch, heading, distance, and limits.
 
@@ -81,7 +82,7 @@ def get_camera_status(address: str, rpc_port: int = 50000, stream_port: int = 50
     return json.dumps(readers.camera_status(conn))
 
 
-def set_sas_mode(address: str, mode: str, enable_sas: bool = True, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, enable_sas: bool = True, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Set SAS on/off and select an SAS hold mode while keeping the simulation running just long enough to align.
 
@@ -96,6 +97,8 @@ def set_sas_mode(address: str, mode: str, enable_sas: bool = True, rpc_port: int
     Notes:
       - Best-effort unpauses before changing SAS and re-pauses after the SAS vector is aligned so you can set a target even while the game starts paused.
     """
+    if mode is None:
+        raise ValueError("mode is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     paused_before = best_effort_paused_state(conn)
     try:

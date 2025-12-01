@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def get_power_status(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_power_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     ElectricCharge summary with generator/consumer counts and best‑effort estimates.
 
@@ -27,7 +28,7 @@ def get_power_status(address: str, rpc_port: int = 50000, stream_port: int = 500
             pass
 
 
-def get_resource_breakdown(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def get_resource_breakdown(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Aggregate resource totals for the whole vessel and the current stage.
 

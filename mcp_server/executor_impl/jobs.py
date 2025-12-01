@@ -137,22 +137,15 @@ class JobRegistry:
 
     def _run_job(self, job_id: str, func: Callable[[JobHandle], Any]) -> None:
         handle = JobHandle(self, job_id)
-        stdout_stream = _LogStream(self, job_id, "stdout")
-        stderr_stream = _LogStream(self, job_id, "stderr")
         self._set_status(job_id, JobStatus.RUNNING)
-        with contextlib.ExitStack() as stack:
-            stack.enter_context(contextlib.redirect_stdout(stdout_stream))
-            stack.enter_context(contextlib.redirect_stderr(stderr_stream))
-            try:
-                func(handle)
-            except Exception as exc:
-                self.fail_job(job_id, str(exc))
-            else:
-                self.complete_job(job_id)
-            finally:
-                stdout_stream.flush()
-                stderr_stream.flush()
-                self._clear_cancel_callback(job_id)
+        try:
+            func(handle)
+        except Exception as exc:
+            self.fail_job(job_id, str(exc))
+        else:
+            self.complete_job(job_id)
+        finally:
+            self._clear_cancel_callback(job_id)
 
     def complete_job(self, job_id: str) -> None:
         self._finish_job(job_id, JobStatus.SUCCEEDED)
@@ -195,6 +188,8 @@ class JobRegistry:
     @staticmethod
     def _is_transient_stream_error(message: str) -> bool:
         msg = message.lower()
+        if "exception in callback" in msg and "proactor" in msg:
+            return True
         if "connectionreseterror" in msg:
             return True
         if "forcibly closed by the remote host" in msg:

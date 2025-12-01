@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from ..executor_tools.jobs import JobStatus, job_registry
 from krpc_index import KRPCSearchIndex, load_dataset
 
 
 _INDEX: KRPCSearchIndex | None = None
+_LOG_CURSORS: Dict[str, int] = {}
+_LOG_CURSOR_LOCK = threading.Lock()
 
 
 def _get_index() -> KRPCSearchIndex:
@@ -65,6 +68,26 @@ def get_krpc_doc_impl(url: str, max_chars: int = 5000) -> str:
     return f"{doc.title}\n{doc.url}\n\nHeadings: {heads}\n\n{body}"
 
 
+def _consume_incremental_logs(job_id: str, logs: List[str]) -> tuple[list[str], int]:
+    """
+    Return only the log entries that haven't been delivered yet for this job_id.
+    Adds a small header and keeps numbering contiguous across calls.
+    """
+    with _LOG_CURSOR_LOCK:
+        cursor = _LOG_CURSORS.get(job_id, 0)
+        total = len(logs)
+        _LOG_CURSORS[job_id] = total
+
+    new_entries = logs[cursor:]
+    header = "log stream start:" if cursor == 0 else "continuing logs:"
+
+    if not new_entries:
+        return [f"{header} (no new entries; cursor={total})"], total
+
+    numbered = [f"{idx}: {line}" for idx, line in enumerate(new_entries, start=cursor + 1)]
+    return [header, *numbered], total
+
+
 def get_job_status_impl(job_id: str) -> str:
     """
     Poll the status of a background job started by tools such as start_part_tree_job.
@@ -86,6 +109,10 @@ def get_job_status_impl(job_id: str) -> str:
             - error: error description when failed or unknown
             - metadata: any job-specific metadata stored at creation time
             - ok: boolean convenience flag (false when FAILED, CANCELLED, or UNKNOWN)
+            - log_cursor: count of total log entries collected so far
+        Notes:
+            - Logs are delivered incrementally per job_id. Subsequent calls only return new entries
+              prefixed with "continuing logs:" and numbered to preserve ordering.
     """
     state = job_registry.get_state(job_id)
     if state is None:
@@ -98,12 +125,14 @@ def get_job_status_impl(job_id: str) -> str:
             "metadata": {},
             "ok": False,
             "log_stream_warning": False,
+            "log_cursor": 0,
         }
         return json.dumps(payload)
 
     payload = state.as_dict()
     payload.setdefault("log_stream_warning", False)
     payload["ok"] = state.status not in (JobStatus.FAILED, JobStatus.CANCELLED)
+    payload["logs"], payload["log_cursor"] = _consume_incremental_logs(job_id, payload["logs"])
     return json.dumps(payload)
 
 

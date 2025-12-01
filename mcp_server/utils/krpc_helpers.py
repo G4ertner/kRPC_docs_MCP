@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+DEFAULT_KRPC_ADDRESS = "127.0.0.1"
+
 from .krpc_utils.client import connect_to_game
 from .async_utils import run_blocking
 
 
 def open_connection(
-    address: str,
+    address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
     stream_port: int = 50001,
     name: str | None = None,
@@ -22,7 +24,7 @@ def open_connection(
 
 
 async def async_open_connection(
-    address: str,
+    address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
     stream_port: int = 50001,
     name: str | None = None,

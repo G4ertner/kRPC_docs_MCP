@@ -180,7 +180,7 @@ def _resolve_timeouts(
     *,
     job_handle: Any | None = None,
 ) -> tuple[float | None, float | None]:
-    """Ensure the soft timeout is never shorter than the hard watchdog."""
+    """Keep caller soft timeout intact and ensure the hard watchdog trails it."""
 
     def _coerce(value: float | None) -> float | None:
         if value is None:
@@ -193,22 +193,23 @@ def _resolve_timeouts(
     soft = _coerce(timeout_sec)
     hard = _coerce(hard_timeout_sec)
 
-    if hard is None:
-        return soft, hard
-
-    if soft is None or soft < hard:
-        msg = (
-            "Soft timeout is shorter than the hard watchdog; extending soft deadline "
-            f"to {hard:.1f}s to avoid premature TimeoutError."
-        )
-        if job_handle is not None:
-            try:
-                job_handle.log(f"[execute_script] {msg}")
-            except Exception:
-                pass
-        else:
-            logging.warning(msg)
-        soft = hard
+    # If both are provided, make sure the hard watchdog is slightly longer than the soft timeout
+    if soft is not None and hard is not None:
+        margin = 10.0
+        if hard <= soft:
+            new_hard = soft + margin
+            msg = (
+                "Hard watchdog was not longer than soft timeout; bumping hard timeout "
+                f"to {new_hard:.1f}s to allow graceful soft timeouts."
+            )
+            if job_handle is not None:
+                try:
+                    job_handle.log(f"[execute_script] {msg}")
+                except Exception:
+                    pass
+            else:
+                logging.warning(msg)
+            hard = new_hard
 
     return soft, hard
 

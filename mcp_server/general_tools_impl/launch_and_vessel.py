@@ -4,9 +4,10 @@ import json
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import open_connection
+from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
-def list_launch_sites(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_launch_sites(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     List available launch sites (e.g., "LaunchPad", "Runway").
     """
@@ -31,7 +32,7 @@ def list_launch_sites(address: str, rpc_port: int = 50000, stream_port: int = 50
             pass
 
 
-def list_launchable_vessels(address: str, craft_directory: str = "VAB", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_launchable_vessels(address: str = DEFAULT_KRPC_ADDRESS, craft_directory: str = "VAB", rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     List the names of craft files that can be launched from the specified directory ("VAB" or "SPH").
     """
@@ -49,7 +50,7 @@ def list_launchable_vessels(address: str, craft_directory: str = "VAB", rpc_port
             pass
 
 
-def launch_vessel(address: str, craft_directory: str, name: str, launch_site: str = "LaunchPad", recover: bool = True, crew: list[str] | None = None, flag_url: str = "", rpc_port: int = 50000, stream_port: int = 50001, conn_name: str | None = None, timeout: float = 10.0) -> str:
+def launch_vessel(address: str = DEFAULT_KRPC_ADDRESS, craft_directory: str = "VAB", name: str | None = None, launch_site: str = "LaunchPad", recover: bool = True, crew: list[str] | None = None, flag_url: str = "", rpc_port: int = 50000, stream_port: int = 50001, conn_name: str | None = None, timeout: float = 10.0) -> str:
     """
     Launch a saved vessel (.craft) to a site via SpaceCenter.launch_vessel.
 
@@ -63,6 +64,8 @@ def launch_vessel(address: str, craft_directory: str, name: str, launch_site: st
 
     Returns JSON: { ok, active_vessel?, error? }.
     """
+    if name is None:
+        raise ValueError("name is required")
     conn = open_connection(address, rpc_port, stream_port, conn_name, timeout)
     try:
         sc = conn.space_center
@@ -84,7 +87,7 @@ def launch_vessel(address: str, craft_directory: str, name: str, launch_site: st
             pass
 
 
-def list_vessels(address: str, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+def list_vessels(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     List vessels in the current save with type/situation and optional distance.
 

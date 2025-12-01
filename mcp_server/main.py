@@ -62,6 +62,8 @@ def main() -> None:
         mcp.settings.host = args.host
     if args.port:
         mcp.settings.port = args.port
+    # Run Streamable HTTP transport in stateless mode so single HTTP calls don't need session IDs.
+    mcp.settings.stateless_http = True
     mcp.run(transport=args.transport, mount_path=args.mount_path)
 
 
