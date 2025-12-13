@@ -7,7 +7,7 @@
 "Computer, fly me to Orbit!"
 - a Kerbal's last words
 
-You always dreamed of having an agent autonomously control your spaceship? No more need to fly boring standard maneuvers like ascent to orbit, rendezvous, landings? Let the AI do them! 
+You always dreamed of having an agent autonomously control your spaceship? No more need to fly boring standard maneuvers like orbital insertion, or rendezvousing? Let the AI do them! 
 
 The **GeePT MCP (Kerbal Mission Command Protocol)** transforms Kerbal Space Program into a remote‑controlled playground for AI agents and human operators.  By combining [kRPC](https://krpc.github.io/krpc/) with a rich set of mission tools, it lets your LLM:
 
@@ -22,7 +22,7 @@ The **GeePT MCP (Kerbal Mission Command Protocol)** transforms Kerbal Space Prog
 
 1. **Install dependencies**
 
-   This project requires Python 3.10+ and [uv](https://github.com/astral-sh/uv) for running scripts and managing dependencies.  Optionally install the `krpc` extras to enable kRPC connectivity and `Pillow` if you want PNG diagram export.
+   This project requires Python 3.10+ and [uv](https://github.com/astral-sh/uv) for running scripts and managing dependencies.
 
    ```sh
    # Clone the repository
@@ -32,7 +32,6 @@ The **GeePT MCP (Kerbal Mission Command Protocol)** transforms Kerbal Space Prog
    # Use uv to run the MCP server
    curl -LsSf https://astral.sh/uv/install.sh | sh  # install uv
    uv pip install -e .[krpc]  # install dependencies with krpc extras
-   uv pip install pillow     # optional, for PNG diagram export
    ```
 
 2. **Launch the MCP server**
@@ -51,7 +50,7 @@ The **GeePT MCP (Kerbal Mission Command Protocol)** transforms Kerbal Space Prog
    If you use [Codex CLI](https://github.com/openai/openai-codex-cli), add the MCP server so it can be launched on demand:
 
    ```sh
-   codex mcp add krpc_docs -- uv run -m mcp_server.main --with krpc
+   codex mcp add geept_mcp -- uv run -m mcp_server.main --transport stdio --with krpc 
    ```
 
 4. **Connect to your game**

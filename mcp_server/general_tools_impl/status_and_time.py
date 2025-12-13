@@ -37,6 +37,103 @@ def get_status_overview(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
             pass
 
 
+def _orbital_ascent_monitor(
+    address: str = DEFAULT_KRPC_ADDRESS,
+    rpc_port: int = 50000,
+    stream_port: int = 50001,
+    name: str | None = None,
+    timeout: float = 5.0,
+    *,
+    altitude_switch_m: float = 50_000.0,
+) -> dict:
+    """Internal helper: compact orbital-ascent monitoring snapshot for logs.
+
+    Collects key ascent telemetry from orbit/flight/staging readers and returns
+    a JSON string with the following fields:
+
+      - apoapsis_altitude_m
+      - periapsis_altitude_m
+      - time_to_apoapsis_s
+      - altitude_sea_level_m
+      - velocity_m_s (surface below altitude_switch_m, orbital above when available)
+      - velocity_mode: 'surface' | 'orbital'
+      - pitch_deg
+      - remaining_delta_v_m_s (sum of current and lower stages)
+      - twr_surface (current stage, if available)
+
+    This function is intended for internal use by ascent/autopilot helpers and
+    is not exposed as an MCP tool.
+    """
+    conn = open_connection(address, rpc_port, stream_port, name, timeout)
+    try:
+        orbit = readers.orbit_info(conn) or {}
+        flight = readers.flight_snapshot(conn) or {}
+        staging = readers.staging_info(conn) or {}
+
+        apo = orbit.get("apoapsis_altitude_m")
+        pe = orbit.get("periapsis_altitude_m")
+        tta = orbit.get("time_to_apoapsis_s")
+
+        alt = flight.get("altitude_sea_level_m")
+        v_surf = flight.get("speed_surface_m_s")
+        v_orb = flight.get("speed_orbital_m_s")
+        pitch = flight.get("pitch_deg")
+
+        # Choose surface vs orbital speed based on altitude
+        velocity_mode = "surface"
+        velocity = v_surf
+        try:
+            if alt is not None and float(alt) >= float(altitude_switch_m) and v_orb is not None:
+                velocity_mode = "orbital"
+                velocity = v_orb
+        except Exception:
+            pass
+
+        # Remaining Δv and current-stage TWR from staging info
+        remaining_dv = None
+        twr = None
+        try:
+            current_stage = staging.get("current_stage")
+            stages = staging.get("stages") or []
+            if current_stage is not None:
+                total = 0.0
+                for seg in stages:
+                    s = seg.get("stage")
+                    dv = seg.get("delta_v_m_s")
+                    if s is None:
+                        continue
+                    # staging_info iterates stages from current down to 0, so
+                    # s <= current_stage corresponds to "remaining" segments.
+                    if dv is not None and s <= current_stage:
+                        try:
+                            total += float(dv)
+                        except Exception:
+                            continue
+                    if s == current_stage and twr is None:
+                        twr = seg.get("twr_surface")
+                remaining_dv = total
+        except Exception:
+            pass
+
+        snapshot = {
+            "apoapsis_altitude_m": f"Apo: {apo} m",
+            "periapsis_altitude_m": f"Peri: {pe} m",
+            "time_to_apoapsis_s": f"Time to Apo: {tta} s",
+            "altitude_sea_level_m": f"Alt: {alt} m",
+            "velocity_m_s": f"V ({velocity_mode}): {velocity} m/s",
+            "pitch_deg": f"Pitch: {pitch} deg",
+            "remaining_delta_v_m_s": f"Δv: {remaining_dv} m/s",
+            "twr_surface": f"TWR: {twr}",
+        }
+
+        return snapshot
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_vessel_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Basic vessel info for the active craft.

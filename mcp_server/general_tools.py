@@ -23,7 +23,7 @@ from .general_tools_impl import (
 )
 
 
-# 🔌💾 Connection & save 🔌💾 ---------------------------------------------------------------------
+# 🔌 Connection test🔌 ---------------------------------------------------------------------
 @mcp.tool()
 def krpc_get_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """Connect to a running kRPC server and return its version (and active vessel if available).
@@ -40,62 +40,6 @@ Args:
 Returns:
     A short status string, or an error message if connection fails."""
     return connection_and_save.krpc_get_status(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def revert_to_launch(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Revert the current flight to launch (KSP's Revert to Launch).
-
-When to use:
-  - Reset a mission after a failed ascent or test, returning the rocket to the launch pad.
-
-Notes:
-  - This calls SpaceCenter.revert_to_launch(). If revert is disabled or not available in the current scene,
-    returns a message indicating it cannot revert."""
-    return connection_and_save.revert_to_launch(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def save_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, tag: str | None = None, prefix: str = 'LLM') -> str:
-    """Save a game checkpoint under a unique LLM-namespaced name.
-
-Behavior:
-  - Generates a unique save name like: "<prefix>_YYYYmmddTHHMMSSZ_<id>".
-  - Uses SpaceCenter.save(name) instead of quicksave() to avoid overwriting the user's quicksave.
-
-Args:
-  tag: Optional label included in the generated name for readability.
-  prefix: Namespace prefix (default "LLM").
-
-Returns JSON: { ok, save_name, note? }."""
-    return connection_and_save.save_llm_checkpoint(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, tag=tag, prefix=prefix)
-
-
-@mcp.tool()
-def load_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, save_name: str = '', require_llm_prefix: bool = True, pause_after: bool = True) -> str:
-    """Load a previously saved checkpoint by name using SpaceCenter.load(name).
-
-Safeguards:
-  - By default, only loads names starting with "LLM_" (set require_llm_prefix=false to override).
-
-Returns JSON: { ok, loaded?: save_name, error? }."""
-    return connection_and_save.load_llm_checkpoint(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, save_name=save_name, require_llm_prefix=require_llm_prefix, pause_after=pause_after)
-
-@mcp.tool()
-def quicksave(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Save a quicksave (SpaceCenter.quicksave()).
-
-Notes:
-  - This overwrites the game's single quicksave slot. Prefer save_llm_checkpoint to create namespaced saves."""
-    return connection_and_save.quicksave(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-@mcp.tool()
-def quickload(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, pause_after: bool = True) -> str:
-    """Load from the quicksave slot (SpaceCenter.quickload()).
-
-Notes:
-  - Prefer load_llm_checkpoint for named saves to avoid conflict with a player's quicksave."""
-    return connection_and_save.quickload(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, pause_after=pause_after)
 
 
 # 🛰️⏱️ Status & time 🛰️⏱️ ---------------------------------------------------------------------
@@ -140,22 +84,6 @@ When to use:
 Returns:
   JSON: { universal_time_s, mission_time_s, timewarp_rate?, timewarp_mode? }."""
     return status_and_time.get_time_status(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-@mcp.tool()
-def set_timewarp_rate(address: str = DEFAULT_KRPC_ADDRESS, rate: float = 1.0, mode: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Set the current timewarp rate (and optionally switch warp mode).
-
-When to use:
-  - Adjust how fast KSP advances time when waiting on long events.
-  - Reset the time speed after a fire-and-forget warp_to call once you verify UT with get_time_status.
-
-Args:
-  rate: Desired timewarp rate; 1.0 is realtime, >1 is warp (0 stops time).
-  mode: Optional name of the warp mode to select ('physics', 'rails', 'none').
-
-Returns:
-  Human-readable status string describing what was set or why the change failed."""
-    return status_and_time.set_timewarp_rate(address=address, rate=rate, mode=mode, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
 # 🌍🧭 Environment & surface 🌍🧭 ---------------------------------------------------------------------
@@ -240,22 +168,6 @@ def get_camera_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
       min_pitch_deg?, max_pitch_deg?, min_distance_m?, max_distance_m? }."""
     return flight_and_control.get_camera_status(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
-@mcp.tool()
-def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, enable_sas: bool = True, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Set SAS on/off and select an SAS hold mode.
-
-    Args:
-      mode: One of the SAS modes (stability_assist, prograde, retrograde, normal, anti_normal,
-        radial, anti_radial, target, anti_target, maneuver). Case- and dash/underscore-insensitive.
-      enable_sas: If true, toggle SAS on before setting the mode.
-
-    Returns:
-      Human-readable status string (success or error). Includes whether the requested orientation was aligned.
-
-    Notes:
-      - Best-effort unpauses, lets SAS align, and then re-applies the pause so you can change heading while the game starts paused.
-      - The tool always pauses the game after alignment so navigation stays predictable even if you were running unpaused."""
-    return flight_and_control.set_sas_mode(address=address, mode=mode, enable_sas=enable_sas, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 @mcp.tool()
 def get_screenshot(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, *, scale: int = 1) -> str:
@@ -445,42 +357,6 @@ Returns:
     return orbit_and_navigation.get_targeting_info(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
-# 🎯🛰️ Target control 🎯🛰️ ---------------------------------------------------------------------
-
-
-@mcp.tool()
-def set_target_body(address: str = DEFAULT_KRPC_ADDRESS, body_name: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Set the active vessel's target body (also tries SpaceCenter.target_body).
-
-Args:
-  body_name: Exact body name (e.g., 'Mun')
-
-Returns:
-  Human‑readable status string or an error if not found."""
-    return target_control.set_target_body(address=address, body_name=body_name, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def set_target_vessel(address: str = DEFAULT_KRPC_ADDRESS, vessel_name: str | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Set the active vessel's target vessel by name (case‑insensitive). Chooses nearest if multiple.
-Also attempts to set SpaceCenter.target_vessel.
-
-Args:
-  vessel_name: Exact or case‑insensitive vessel name
-
-Returns:
-  Human‑readable status string or error if not found."""
-    return target_control.set_target_vessel(address=address, vessel_name=vessel_name, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def clear_target(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Clear target_docking_port, target_vessel, and target_body if set.
-
-Returns:
-  Human‑readable status string: 'Cleared target.' or 'No target to clear.'"""
-    return target_control.clear_target(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
 
 # 🌌📍 Bodies & waypoints 🌌📍 ---------------------------------------------------------------------
 
@@ -522,20 +398,6 @@ def list_launchable_vessels(address: str = DEFAULT_KRPC_ADDRESS, craft_directory
     return launch_and_vessel.list_launchable_vessels(address=address, craft_directory=craft_directory, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
-@mcp.tool()
-def launch_vessel(address: str = DEFAULT_KRPC_ADDRESS, craft_directory: str = 'VAB', name: str | None = None, launch_site: str = 'LaunchPad', recover: bool = True, crew: list[str] | None = None, flag_url: str = '', rpc_port: int = 50000, stream_port: int = 50001, conn_name: str | None = None, timeout: float = 10.0) -> str:
-    """Launch a saved vessel (.craft) to a site via SpaceCenter.launch_vessel.
-
-Args:
-  craft_directory: "VAB" or "SPH"
-  name: Craft filename without ".craft" (must exist in the save's Ships/<dir> folder)
-  launch_site: "LaunchPad" or "Runway"
-  recover: If true, recover an existing vessel on the site before launch
-  crew: Optional list of Kerbal names to assign
-  flag_url: Optional asset URL for mission flag
-
-Returns JSON: { ok, active_vessel?, error? }."""
-    return launch_and_vessel.launch_vessel(address=address, craft_directory=craft_directory, name=name, launch_site=launch_site, recover=recover, crew=crew, flag_url=flag_url, rpc_port=rpc_port, stream_port=stream_port, conn_name=conn_name, timeout=timeout)
 
 
 @mcp.tool()
@@ -572,73 +434,7 @@ Returns:
     return maneuver_nodes.list_maneuver_nodes_detailed(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
-@mcp.tool()
-def set_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, prograde: float = 0.0, normal: float = 0.0, radial: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Create a maneuver node at a specific UT with given vector components.
 
-    When to use:
-      - Apply a proposed burn from compute_* helpers to the game.
-      - LLM: After creating the node, set SAS to target via set_sas_mode before executing the burn.
-
-    Args:
-      ut: Universal time for the node
-      prograde: Prograde component (m/s)
-      normal: Normal component (m/s)
-  radial: Radial component (m/s)
-
-Returns:
-  JSON echo of the created node parameters."""
-    return maneuver_nodes.set_maneuver_node(address=address, ut=ut, prograde=prograde, normal=normal, radial=radial, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def update_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, node_index: int = 0, ut: float | None = None, prograde: float | None = None, normal: float | None = None, radial: float | None = None, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Edit an existing maneuver node (default: first node).
-
-Args:
-  node_index: 0‑based index (default: 0)
-  ut/prograde/normal/radial: Components to update (None to leave unchanged)
-
-Returns:
-  JSON echo of the updated node: { index, ut, prograde, normal, radial }."""
-    return maneuver_nodes.update_maneuver_node(address=address, node_index=node_index, ut=ut, prograde=prograde, normal=normal, radial=radial, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def delete_maneuver_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Remove all maneuver nodes for the active vessel.
-
-When to use:
-  - Cleanup after executing nodes or starting a new plan.
-
-Returns:
-  Human‑readable status string with count removed."""
-    return maneuver_nodes.delete_maneuver_nodes(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
-@mcp.tool()
-def warp_to(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, lead_time_s: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """
-    Best‑effort warp‑to.
-
-    When to use:
-      - Warp to a node or event time with optional lead time.
-
-    Args:
-      ut: Target universal time to arrive at
-      lead_time_s: Seconds to arrive before UT (e.g., half burn time)
-
-    Returns:
-      Human-readable status string, or a message if unsupported.
-
-    Notes:
-      - The underlying kRPC warp call is fire-and-forget. If the tool hits the 60s timeout,
-        KSP will continue warping even though the tool never received confirmation.
-      - After issuing a warp_to, call get_time_status (check time) and, if needed, use set_timewarp_rate
-        to reset the warp speed before running more commands.
-      - **Important**: Warps will only work outside of an atmosphere. If you try to warp while being below 70 km, nothing will happen.
-    """
-    return maneuver_nodes.warp_to(address=address, ut=ut, lead_time_s=lead_time_s, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
 # 📝🧠 Planning helpers 📝🧠 ---------------------------------------------------------------------

@@ -88,7 +88,7 @@ def _consume_incremental_logs(job_id: str, logs: List[str]) -> tuple[list[str], 
     return [header, *numbered], total
 
 
-def get_job_status_impl(job_id: str) -> str:
+def get_job_status_impl(job_id: str) -> dict:
     """
     Poll the status of a background job started by tools such as start_part_tree_job.
 
@@ -127,13 +127,13 @@ def get_job_status_impl(job_id: str) -> str:
             "log_stream_warning": False,
             "log_cursor": 0,
         }
-        return json.dumps(payload)
+        return payload
 
     payload = state.as_dict()
     payload.setdefault("log_stream_warning", False)
     payload["ok"] = state.status not in (JobStatus.FAILED, JobStatus.CANCELLED)
     payload["logs"], payload["log_cursor"] = _consume_incremental_logs(job_id, payload["logs"])
-    return json.dumps(payload)
+    return payload
 
 
 def cancel_job_impl(job_id: str, reason: str | None = None) -> str:

@@ -124,7 +124,7 @@ def start_execute_script_job_impl(
     unpause_on_start: bool = True,
     allow_imports: bool = False,
     hard_timeout_sec: float | None = None,
-) -> str:
+) -> dict:
     """
     Start a background job that runs execute_script with live log streaming.
     Usage pattern:
@@ -163,15 +163,15 @@ def start_execute_script_job_impl(
         handle.log(f"[execute_script] artifact ready at {artifact}")
 
     job_id = job_registry.create_job(job_fn, metadata={"kind": "execute_script"})
-    return json.dumps({
+    return {
         "job_id": job_id,
         "status": "PENDING",
         "note": (
             "Script job started. Poll get_job_status(job_id) for live logs, "
-            "alternate with get_status_overview/get_flight_snapshot to monitor the vessel, "
+            # "alternate with get_status_overview/get_flight_snapshot to monitor the vessel, "
             "and call cancel_job(job_id) + revert/load if the burn goes sideways."
         ),
-    })
+    }
 
 
 def _resolve_timeouts(
@@ -180,7 +180,7 @@ def _resolve_timeouts(
     *,
     job_handle: Any | None = None,
 ) -> tuple[float | None, float | None]:
-    """Keep caller soft timeout intact and ensure the hard watchdog trails it."""
+    """Normalize timeouts so soft is at least as long as hard when both are provided."""
 
     def _coerce(value: float | None) -> float | None:
         if value is None:
@@ -193,23 +193,35 @@ def _resolve_timeouts(
     soft = _coerce(timeout_sec)
     hard = _coerce(hard_timeout_sec)
 
-    # If both are provided, make sure the hard watchdog is slightly longer than the soft timeout
-    if soft is not None and hard is not None:
+    def _warn(msg: str) -> None:
+        if job_handle is not None:
+            try:
+                job_handle.log(f"[execute_script] {msg}")
+            except Exception:
+                pass
+        else:
+            logging.warning(msg)
+
+    # If caller supplies only a hard timeout, extend the soft timeout to match it.
+    if soft is None and hard is not None:
+        soft = hard
+        _warn(f"Soft timeout not set; extending soft deadline to {hard:.1f}s to match hard watchdog.")
+
+    # If soft is shorter than hard, extend soft to give the script a chance to wrap up gracefully.
+    if soft is not None and hard is not None and soft < hard:
+        soft = hard
+        _warn(f"Soft timeout shorter than hard watchdog; extending soft deadline to {soft:.1f}s.")
+
+    # When soft is meaningfully longer than hard for long-running tasks, trail the hard watchdog behind soft by a margin.
+    if soft is not None and hard is not None and soft > hard and soft >= 60:
         margin = 10.0
-        if hard <= soft:
-            new_hard = soft + margin
-            msg = (
-                "Hard watchdog was not longer than soft timeout; bumping hard timeout "
-                f"to {new_hard:.1f}s to allow graceful soft timeouts."
+        target = soft + margin
+        if hard < target:
+            hard = target
+            _warn(
+                "Hard watchdog was shorter than soft timeout; bumping hard timeout "
+                f"to {hard:.1f}s so it trails the soft deadline."
             )
-            if job_handle is not None:
-                try:
-                    job_handle.log(f"[execute_script] {msg}")
-                except Exception:
-                    pass
-            else:
-                logging.warning(msg)
-            hard = new_hard
 
     return soft, hard
 

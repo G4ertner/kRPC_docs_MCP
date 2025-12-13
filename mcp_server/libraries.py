@@ -1,7 +1,20 @@
 from __future__ import annotations
 
-from .mcp_context import mcp
-from .library_impl import krpc_docs, ksp_wiki, snippets
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    repo_root = Path(__file__).resolve().parent.parent
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+    from mcp_server.mcp_context import mcp
+    from mcp_server.library_impl import krpc_docs, ksp_wiki, snippets
+    from mcp_server.general_tools_impl.status_and_time import _orbital_ascent_monitor
+else:
+    from .mcp_context import mcp
+    from .library_impl import krpc_docs, ksp_wiki, snippets
+    from .general_tools_impl.status_and_time import _orbital_ascent_monitor
 
 
 def _copy_doc(target, source):
@@ -41,12 +54,12 @@ def get_krpc_doc(url: str, max_chars: int = 5000) -> str:
 
 
 @mcp.tool()
-def get_job_status(job_id: str) -> str:
+def get_job_status(job_id: str) -> dict:
     """
-    Poll the status of a background job started by tools such as start_part_tree_job.
+    Poll the status of a background job started by tools such as start_execute_script_job.
 
     Usage pattern:
-        1. Call a job-starting tool (e.g., start_part_tree_job/start_stage_plan_job) to get a job_id.
+        1. Call a job-starting tool (e.g., start_execute_script_job/start_stage_plan_job) to get a job_id.
         2. Poll get_job_status(job_id) until "status" == "SUCCEEDED" (or FAILED for troubleshooting).
         3. When SUCCEEDED, call read_resource on "result_resource" (resource://jobs/<id>.json) to fetch the artifact.
         4. If FAILED, inspect logs/error, address the issue, and optionally restart the job.
@@ -62,7 +75,24 @@ def get_job_status(job_id: str) -> str:
             - metadata: any job-specific metadata stored at creation time
             - ok: boolean convenience flag (false when FAILED, CANCELLED, or UNKNOWN)
     """
-    return krpc_docs.get_job_status_impl(job_id=job_id)
+
+    # check if job_id comes with log info
+    if len(job_id) <= 32:
+        log_call = ""
+    elif len(job_id) > 32:
+        log_call = job_id[32:]
+        job_id = job_id[:32]
+        
+
+    # call the logging message
+    if log_call == "_asc":
+        log = {"game_logging": _orbital_ascent_monitor()}
+    else:
+        log = {}
+    return krpc_docs.get_job_status_impl(job_id=job_id) | log
+
+
+ 
 
 
 
@@ -194,4 +224,3 @@ def snippets_search_and_resolve(query: str, k: int = 10, mode: str = "hybrid", r
 @mcp.resource("resource://snippets/usage")
 def get_snippets_usage() -> str:
     return snippets.get_snippets_usage_impl()
-

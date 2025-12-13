@@ -138,8 +138,14 @@ class JobRegistry:
     def _run_job(self, job_id: str, func: Callable[[JobHandle], Any]) -> None:
         handle = JobHandle(self, job_id)
         self._set_status(job_id, JobStatus.RUNNING)
+        stdout_stream = _LogStream(self, job_id, "stdout")
+        stderr_stream = _LogStream(self, job_id, "stderr")
         try:
-            func(handle)
+            with contextlib.redirect_stdout(stdout_stream), contextlib.redirect_stderr(stderr_stream):
+                func(handle)
+                # flush any trailing partial lines
+                stdout_stream.flush()
+                stderr_stream.flush()
         except Exception as exc:
             self.fail_job(job_id, str(exc))
         else:
