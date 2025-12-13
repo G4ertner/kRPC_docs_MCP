@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import re
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -20,6 +22,25 @@ else:
 def _copy_doc(target, source):
     target.__doc__ = getattr(source, "__doc__", None)
     return target
+
+
+_CANONICAL_JOB_ID_RE = re.compile(r"^([0-9a-fA-F]{32})(.*)$")
+
+
+def _split_job_id(requested_job_id: str) -> tuple[str, str]:
+    """
+    Split a possibly-suffixed job id into (canonical_job_id, suffix).
+
+    The canonical job id is the 32-hex UUID used by the internal JobRegistry.
+    Suffixes are an out-of-band convention used by some tool wrappers to request
+    extra logging/monitoring payloads during polling.
+
+    If the string does not begin with a 32-hex prefix, it is treated as-is.
+    """
+    match = _CANONICAL_JOB_ID_RE.match(requested_job_id or "")
+    if not match:
+        return requested_job_id, ""
+    return match.group(1), match.group(2)
 
 
 @mcp.tool()
@@ -54,7 +75,7 @@ def get_krpc_doc(url: str, max_chars: int = 5000) -> str:
 
 
 @mcp.tool()
-def get_job_status(job_id: str) -> dict:
+def get_job_status(job_id: str) -> str:
     """
     Poll the status of a background job started by tools such as start_execute_script_job.
 
@@ -76,20 +97,21 @@ def get_job_status(job_id: str) -> dict:
             - ok: boolean convenience flag (false when FAILED, CANCELLED, or UNKNOWN)
     """
 
-    # check if job_id comes with log info
-    if len(job_id) <= 32:
-        log_call = ""
-    elif len(job_id) > 32:
-        log_call = job_id[32:]
-        job_id = job_id[:32]
-        
+    requested_job_id = job_id
+    canonical_job_id, suffix = _split_job_id(requested_job_id)
 
-    # call the logging message
-    if log_call == "_asc":
-        log = {"game_logging": _orbital_ascent_monitor()}
-    else:
-        log = {}
-    return krpc_docs.get_job_status_impl(job_id=job_id) | log
+    # Optional extra telemetry payload requested via suffix convention.
+    extra: dict = {}
+    if suffix == "_asc":
+        extra["game_logging"] = _orbital_ascent_monitor()
+
+    payload = krpc_docs.get_job_status_impl(job_id=canonical_job_id) | extra
+
+    # Echo the exact identifier the caller used, but also expose the canonical id.
+    payload["job_id"] = requested_job_id
+    payload["canonical_job_id"] = canonical_job_id
+    payload["job_id_suffix"] = suffix
+    return json.dumps(payload)
 
 
  
@@ -107,7 +129,8 @@ def cancel_job(job_id: str, reason: str | None = None) -> str:
     Returns:
         JSON: { ok: bool, message: str }
     """
-    return krpc_docs.cancel_job_impl(job_id=job_id, reason=reason)
+    canonical_job_id, _suffix = _split_job_id(job_id)
+    return krpc_docs.cancel_job_impl(job_id=canonical_job_id, reason=reason)
 
 
 @mcp.tool()

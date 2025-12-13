@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 
 from .mcp_context import mcp
@@ -109,10 +110,16 @@ def start_execute_script_job(
         hard_timeout_sec=hard_timeout_sec,
     )
 
-    res['job_id'] = res['job_id'] + log_call
+    # Preserve the canonical internal id separately; some callers append a suffix
+    # to request enhanced logging/monitoring during get_job_status polling.
+    canonical_job_id = res.get("job_id")
+    res["canonical_job_id"] = canonical_job_id
+    res["job_id_suffix"] = log_call
+    if isinstance(canonical_job_id, str) and log_call:
+        res["job_id"] = canonical_job_id + log_call
 
     # Fallback: return as-is if an unexpected type shows up (maintains prior behavior without crashing).
-    return res
+    return json.dumps(res)
 
 # Expose the low-level runner for tests (monkeypatched in unit tests)
 _run_execute_script = core_run_execute_script

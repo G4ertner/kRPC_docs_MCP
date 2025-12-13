@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import time
+import threading
 
-from mcp_server.executor_tools.jobs import job_registry
-from mcp_server.libraries import get_job_status
+from mcp_server.executor_tools.jobs import JobStatus, job_registry
+from mcp_server.libraries import cancel_job, get_job_status
 
 
 def _wait_for_status(job_id: str, timeout: float = 5.0) -> dict:
@@ -79,3 +80,38 @@ def test_logs_are_incremental_and_numbered():
     third = json.loads(get_job_status(job_id))
     assert third["log_cursor"] == 3
     assert any("3:" in line and "third" in line for line in third["logs"])
+
+
+def test_get_job_status_echoes_requested_id_with_suffix():
+    job_id = job_registry.create_job(lambda handle: None)
+    job_registry.wait_for(job_id)
+
+    requested = f"{job_id}_atm"
+    payload = json.loads(get_job_status(requested))
+
+    assert payload["status"] == "SUCCEEDED"
+    assert payload["job_id"] == requested
+    assert payload["canonical_job_id"] == job_id
+    assert payload["job_id_suffix"] == "_atm"
+
+
+def test_cancel_job_accepts_suffixed_id():
+    stop_event = threading.Event()
+    callback_ready = threading.Event()
+
+    def job(handle):
+        handle.register_cancel_callback(stop_event.set)
+        callback_ready.set()
+        while not stop_event.is_set():
+            handle.log("running")
+            time.sleep(0.02)
+
+    job_id = job_registry.create_job(job)
+    assert callback_ready.wait(timeout=2.0)
+    resp = json.loads(cancel_job(f"{job_id}_atm"))
+    assert resp["ok"] is True
+
+    job_registry.wait_for(job_id, timeout=5.0)
+    state = job_registry.get_state(job_id)
+    assert state is not None
+    assert state.status is JobStatus.CANCELLED
