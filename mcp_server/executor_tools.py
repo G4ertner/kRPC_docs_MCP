@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 
 from .mcp_context import mcp
@@ -15,6 +14,7 @@ from .executor_impl import job_artifacts as _job_artifacts
 from .executor_impl import job_tools as _job_tools
 from .executor_impl import jobs as _jobs
 from .executor_impl import script_jobs as _script_jobs
+from .utils.json_utils import dumps as json_dumps
 from .utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 from .general_tools_impl import (
     connection_and_save,
@@ -45,8 +45,6 @@ def start_execute_script_job(
     name: str | None = None,
     *,
     timeout_sec: float | None = None,
-    pause_on_end: bool = True,
-    unpause_on_start: bool = True,
     allow_imports: bool = False,
     hard_timeout_sec: float | None = None,
     logging_mode = None,
@@ -77,7 +75,7 @@ def start_execute_script_job(
         4. When the job finishes, call read_resource(result_resource) to download the same JSON payload execute_script returns.
 
     Operational behavior:
-      - On start: best-effort unpause (unpause_on_start=true by default) so physics runs.
+      - On start: best-effort unpause so physics runs.
       - On end (success, failure, or exception): best-effort pause.
       - Soft timeout: your script should call `check_time()` inside loops; on TimeoutError
         the runner pauses and returns `ok=false` with `pre_pause_flight`.
@@ -104,8 +102,6 @@ def start_execute_script_job(
         stream_port=stream_port,
         name=name,
         timeout_sec=timeout_sec,
-        pause_on_end=pause_on_end,
-        unpause_on_start=unpause_on_start,
         allow_imports=allow_imports,
         hard_timeout_sec=hard_timeout_sec,
     )
@@ -119,7 +115,7 @@ def start_execute_script_job(
         res["job_id"] = canonical_job_id + log_call
 
     # Fallback: return as-is if an unexpected type shows up (maintains prior behavior without crashing).
-    return json.dumps(res)
+    return json_dumps(res)
 
 # Expose the low-level runner for tests (monkeypatched in unit tests)
 _run_execute_script = core_run_execute_script
@@ -329,11 +325,9 @@ def warp_to(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, lead_t
       Human-readable status string, or a message if unsupported.
 
     Notes:
-      - The underlying kRPC warp call is fire-and-forget. If the tool hits the 60s timeout,
-        KSP will continue warping even though the tool never received confirmation.
-      - After issuing a warp_to, call get_time_status (check time) and, if needed, use set_timewarp_rate
-        to reset the warp speed before running more commands.
-      - **Important**: Warps will only work outside of an atmosphere. If you try to warp while being below 70 km, nothing will happen.
+      - This tool starts a background warp job and returns immediately with a job id in the message.
+      - Poll get_job_status(job_id) for progress; cancel_job(job_id) will attempt to reset warp back to realtime.
+      - **Important**: Rails warps will not work in atmosphere; the job will fail fast with a clear error.
     """
     return maneuver_nodes.warp_to(address=address, ut=ut, lead_time_s=lead_time_s, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 # TODO: We should have two warp tools, one to warp to specific time and one to warp to maneuver node.

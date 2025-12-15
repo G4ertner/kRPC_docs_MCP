@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import re
 import threading
 import time
 import uuid
@@ -20,6 +21,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
+
+
+_TRACEBACK_START = "Traceback (most recent call last):"
+_TRACEBACK_TERMINATOR_RE = re.compile(
+    r"^(?:[A-Za-z_][A-Za-z0-9_.]*Error|[A-Za-z_][A-Za-z0-9_.]*Exception|OSError|RuntimeError|CancelledError)(?::|$)"
+)
 
 
 def _utc_now() -> float:
@@ -53,6 +60,7 @@ class JobState:
     metadata: Dict[str, Any] = field(default_factory=dict)
     cancel_requested: bool = False
     log_stream_warning: bool = False
+    traceback_suppressed: bool = False
 
     def as_dict(self) -> Dict[str, Any]:
         """Serialize the job state with ISO timestamps for JSON transport."""
@@ -68,6 +76,7 @@ class JobState:
             "metadata": dict(self.metadata),
             "cancel_requested": self.cancel_requested,
             "log_stream_warning": self.log_stream_warning,
+            "traceback_suppressed": self.traceback_suppressed,
         }
 
 
@@ -113,6 +122,10 @@ class JobHandle:
         """Register a callable that will be invoked if the job is cancelled."""
         self._registry.register_cancel_callback(self.job_id, callback)
 
+    def is_cancel_requested(self) -> bool:
+        """Return True if a cancellation request has been registered for this job."""
+        return self._registry.is_cancel_requested(self.job_id)
+
 
 class JobRegistry:
     """Central registry that manages background job execution and state."""
@@ -123,6 +136,8 @@ class JobRegistry:
         self._cancel_callbacks: Dict[str, Callable[[], None]] = {}
         self._lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="job-runner")
+        # Buffer stderr traceback blocks so we can suppress known-benign shutdown noise.
+        self._stderr_tracebacks: Dict[str, List[str]] = {}
 
     def create_job(self, func: Callable[[JobHandle], Any], metadata: Optional[Dict[str, Any]] = None) -> str:
         job_id = uuid.uuid4().hex
@@ -170,6 +185,17 @@ class JobRegistry:
             state.finished_at = _utc_now()
             state.error = error
 
+            # Resolve any partially buffered stderr traceback on job completion.
+            buffer = self._stderr_tracebacks.pop(job_id, None)
+            if buffer:
+                if status == JobStatus.FAILED:
+                    timestamp = datetime.now(tz=timezone.utc).isoformat()
+                    for line in buffer:
+                        state.logs.append(f"[{timestamp}] [stderr] {line}")
+                else:
+                    state.log_stream_warning = True
+                    state.traceback_suppressed = True
+
     def _set_status(self, job_id: str, status: JobStatus) -> None:
         with self._lock:
             state = self._jobs.get(job_id)
@@ -186,10 +212,57 @@ class JobRegistry:
             state = self._jobs.get(job_id)
             if not state:
                 return
+            if stream == "stderr" and self._capture_or_suppress_stderr_traceback_locked(
+                state=state,
+                job_id=job_id,
+                message=message,
+                timestamp=timestamp,
+            ):
+                return
             if self._is_transient_stream_error(message):
                 state.log_stream_warning = True
                 return
             state.logs.append(entry)
+
+    def _capture_or_suppress_stderr_traceback_locked(
+        self,
+        *,
+        state: JobState,
+        job_id: str,
+        message: str,
+        timestamp: str,
+    ) -> bool:
+        """Consume stderr traceback blocks; suppress known-benign shutdown ones.
+
+        Returns True if the line was handled (buffered, suppressed, or flushed).
+        """
+        buffer = self._stderr_tracebacks.get(job_id)
+
+        if message.startswith(_TRACEBACK_START):
+            self._stderr_tracebacks[job_id] = [message]
+            return True
+
+        if not buffer:
+            return False
+
+        buffer.append(message)
+
+        # Wait until the traceback terminator line before deciding.
+        if not _TRACEBACK_TERMINATOR_RE.match(message.strip()):
+            return True
+
+        transient = any(self._is_transient_stream_error(line) for line in buffer)
+        if transient:
+            state.log_stream_warning = True
+            state.traceback_suppressed = True
+            self._stderr_tracebacks.pop(job_id, None)
+            return True
+
+        # Non-transient: flush buffered traceback lines as normal stderr entries.
+        for line in buffer:
+            state.logs.append(f"[{timestamp}] [stderr] {line}")
+        self._stderr_tracebacks.pop(job_id, None)
+        return True
 
     @staticmethod
     def _is_transient_stream_error(message: str) -> bool:
@@ -205,6 +278,11 @@ class JobRegistry:
         if "_call_connection_lost" in msg:
             return True
         if "broken pipe" in msg:
+            return True
+        # Common benign shutdown noise seen on Windows (asyncio/proactor + socket teardown).
+        if "winerror 10038" in msg:
+            return True
+        if "an operation was attempted on something that is not a socket" in msg:
             return True
         return False
 
@@ -238,7 +316,15 @@ class JobRegistry:
                 error=state.error,
                 metadata=dict(state.metadata),
                 log_stream_warning=state.log_stream_warning,
+                traceback_suppressed=state.traceback_suppressed,
             )
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        with self._lock:
+            state = self._jobs.get(job_id)
+            if not state:
+                return False
+            return bool(state.cancel_requested)
 
     def wait_for(self, job_id: str, timeout: Optional[float] = None) -> None:
         future: Optional[Future[Any]]

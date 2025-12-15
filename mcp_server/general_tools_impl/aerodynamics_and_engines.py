@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -19,7 +18,7 @@ def get_aero_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, 
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.aero_status(conn))
+        return json_dumps(readers.aero_status(conn))
     finally:
         try:
             conn.close()
@@ -39,4 +38,4 @@ def get_engine_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
       max_thrust_n, specific_impulse_s, throttle }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.engine_status(conn))
+    return json_dumps(readers.engine_status(conn))

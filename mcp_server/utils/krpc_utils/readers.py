@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from math import atan, atan2, cos, sqrt, radians, sin
+from math import atan, atan2, cos, isfinite, sqrt, radians, sin
 
 from ..physics_utils import G0, simple_burn_time, tsiolkovsky_burn_time
 
@@ -136,18 +136,33 @@ def flight_snapshot(conn) -> Dict[str, Any]:
 def orbit_info(conn) -> Dict[str, Any]:
     v = conn.space_center.active_vessel
     o = v.orbit
+
+    def _finite_or_none(x: Any) -> float | None:
+        try:
+            if x is None:
+                return None
+            xf = float(x)
+            return xf if isfinite(xf) else None
+        except Exception:
+            return None
+
+    ecc = _finite_or_none(getattr(o, "eccentricity", None))
+    is_hyperbolic = ecc is not None and ecc >= 1.0
+
     return {
         "body": o.body.name,
-        "apoapsis_altitude_m": getattr(o, "apoapsis_altitude", None),
-        "time_to_apoapsis_s": getattr(o, "time_to_apoapsis", None),
-        "periapsis_altitude_m": getattr(o, "periapsis_altitude", None),
-        "time_to_periapsis_s": getattr(o, "time_to_periapsis", None),
-        "eccentricity": getattr(o, "eccentricity", None),
-        "inclination_deg": getattr(o, "inclination", None),
-        "lan_deg": getattr(o, "longitude_of_ascending_node", None),
-        "argument_of_periapsis_deg": getattr(o, "argument_of_periapsis", None),
-        "semi_major_axis_m": getattr(o, "semi_major_axis", None),
-        "period_s": getattr(o, "period", None),
+        # Hyperbolic/parabolic trajectories have no apoapsis/period. kRPC may return +/-Inf for these.
+        "apoapsis_altitude_m": None if is_hyperbolic else _finite_or_none(getattr(o, "apoapsis_altitude", None)),
+        "time_to_apoapsis_s": None if is_hyperbolic else _finite_or_none(getattr(o, "time_to_apoapsis", None)),
+        "periapsis_altitude_m": _finite_or_none(getattr(o, "periapsis_altitude", None)),
+        "time_to_periapsis_s": _finite_or_none(getattr(o, "time_to_periapsis", None)),
+        "eccentricity": ecc,
+        "inclination_deg": _finite_or_none(getattr(o, "inclination", None)),
+        "lan_deg": _finite_or_none(getattr(o, "longitude_of_ascending_node", None)),
+        "argument_of_periapsis_deg": _finite_or_none(getattr(o, "argument_of_periapsis", None)),
+        # Hyperbolic orbits have a negative semi-major axis; keep the finite value.
+        "semi_major_axis_m": _finite_or_none(getattr(o, "semi_major_axis", None)),
+        "period_s": None if is_hyperbolic else _finite_or_none(getattr(o, "period", None)),
     }
 
 
@@ -2115,7 +2130,10 @@ def vessel_blueprint(conn) -> Dict[str, Any]:
                 'part_id': pid,
                 'name': getattr(getattr(e, 'part', None), 'title', None),
                 'max_thrust_n': getattr(e, 'max_thrust', None),
-                'specific_impulse_s': getattr(e, 'specific_impulse', None),
+                # Expose both ends of the atmosphere curve to avoid ambiguity when
+                # comparing with stage plans computed for a specific environment.
+                'isp_vacuum_s': _engine_isp(e, "vacuum"),
+                'isp_sea_level_s': _engine_isp(e, "sea_level"),
                 'throttle': getattr(e, 'throttle', None),
             })
     except Exception:

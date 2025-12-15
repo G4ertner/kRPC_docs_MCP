@@ -183,3 +183,10 @@ Make full use of these playbooks to better understand
 Use these playbooks to structure your plan and tool calls before generating scripts.
 
 ---
+
+## Restart Server
+
+When you edit or add code to the GeePT MCP repo, you will have to restart the server in order to see the changes reflected when actually using geept_mcp tools.
+
+From the repo root, run `restart_mcp_server.bat` to restart the MCP server and pick up your changes. This script stops any running `mcp_server.main` instance first, then starts a fresh one.
+

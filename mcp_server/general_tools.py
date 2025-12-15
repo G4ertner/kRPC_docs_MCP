@@ -175,7 +175,9 @@ def get_screenshot(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
 
     Notes:
       - Requires the MCP server and KSP to run on the same PC (localhost/127.0.0.1/::1) so the saved file is accessible.
-      - LLM: After calling, fetch/render the returned resource URI (or resource://screenshots/latest) via read_resource/view_image so you actually see the image in chat.
+      - Filenames are unique per call (safe to call in fast loops).
+      - LLM: To view the screenshot, use the returned `resource_uri` (resource://screenshots/<filename>) or `resource://screenshots/latest`.
+        The file is also saved on disk at `saved_path` (usually `artifacts/screenshots/<filename>`).
 
     Args:
       scale: Resolution scaling factor forwarded to SpaceCenter.screenshot (1-4).
@@ -590,9 +592,14 @@ def export_blueprint_diagram(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int 
     """
     return blueprints.export_blueprint_diagram(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, format=format, out_dir=out_dir)
 
-@mcp.resource("resource://blueprints/latest")
-def resource_get_latest_blueprint():
-    return blueprints.get_latest_blueprint()
+@mcp.resource("resource://staging/latest")
+def resource_get_latest_staging():
+    return blueprints.get_latest_staging()
+
+
+@mcp.resource("resource://vessel-blueprint/latest")
+def resource_get_latest_vessel_blueprint():
+    return blueprints.get_latest_vessel_blueprint()
 
 
 @mcp.resource("resource://blueprints/last-diagram.svg")
@@ -604,3 +611,7 @@ def resource_get_last_svg():
 def resource_get_last_png():
     return blueprints.get_last_png()
 
+
+@mcp.resource("resource://blueprints/{filename}")
+def resource_get_blueprint_file(filename: str):
+    return blueprints.resource_payload_for(filename)

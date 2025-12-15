@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import (
     best_effort_pause,
     best_effort_paused_state,
@@ -26,7 +25,7 @@ def get_flight_snapshot(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.flight_snapshot(conn))
+        return json_dumps(readers.flight_snapshot(conn))
     finally:
         try:
             conn.close()
@@ -48,7 +47,7 @@ def get_attitude_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.attitude_status(conn))
+        return json_dumps(readers.attitude_status(conn))
     finally:
         try:
             conn.close()
@@ -67,7 +66,7 @@ def get_action_groups_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int 
       JSON: { sas, rcs, lights, gear, brakes, abort, custom_1..custom_10 }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.action_groups_status(conn))
+    return json_dumps(readers.action_groups_status(conn))
 
 
 def get_camera_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
@@ -79,7 +78,7 @@ def get_camera_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
       min_pitch_deg?, max_pitch_deg?, min_distance_m?, max_distance_m? }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.camera_status(conn))
+    return json_dumps(readers.camera_status(conn))
 
 
 def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, enable_sas: bool = True, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:

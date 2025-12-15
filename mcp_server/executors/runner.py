@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import signal
 import sys
 import traceback
@@ -10,6 +11,7 @@ from typing import Any, Dict, Optional
 
 from ..utils.krpc_utils.client import connect_to_game
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from .injectors import build_globals, restore_after_exec
 from .parsers import EXEC_META_PREFIX
 
@@ -133,7 +135,7 @@ def _signal_handler(signum, frame):
             "pre_pause_flight": pre_pause_flight,
         }
         # Ensure meta line is printed so parent can parse a graceful end
-        print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+        print(f"{EXEC_META_PREFIX}{json_dumps(meta)}")
     finally:
         # 128 + signal number is conventional exit code for signals
         code = 128 + int(signum or 0)
@@ -154,8 +156,10 @@ def main() -> None:
     _raw_timeout = cfg.get("timeout_sec", None)
     timeout_sec = None if _raw_timeout in (None, "", 0, 0.0) else float(_raw_timeout)
     allow_imports = bool(cfg.get("allow_imports", False))
-    pause_on_end = bool(cfg.get("pause_on_end", True))
-    unpause_on_start = bool(cfg.get("unpause_on_start", True))
+    # Safety invariant: scripts are executed with the simulation running, then the game is paused
+    # at the end for deterministic inspection and to prevent runaway thrust/burns.
+    pause_on_end = True
+    unpause_on_start = True
 
     exec_start = _time.monotonic()
     paused: bool | None = None
@@ -195,7 +199,7 @@ def main() -> None:
             sys.stderr.flush()
         except Exception:
             pass
-        print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+        print(f"{EXEC_META_PREFIX}{json_dumps(meta)}")
         return
 
     # Capture initial state
@@ -239,7 +243,7 @@ def main() -> None:
             sys.stderr.flush()
         except Exception:
             pass
-        print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+        print(f"{EXEC_META_PREFIX}{json_dumps(meta)}")
         return
 
     try:
@@ -269,7 +273,7 @@ def main() -> None:
             sys.stderr.flush()
         except Exception:
             pass
-        print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+        print(f"{EXEC_META_PREFIX}{json_dumps(meta)}")
         return
 
     try:
@@ -306,7 +310,7 @@ def main() -> None:
         "exec_time_s": _time.monotonic() - exec_start,
         "pre_pause_flight": (locals().get('pre_pause_flight', None)),
     }
-    print(f"{EXEC_META_PREFIX}{json.dumps(meta)}")
+    print(f"{EXEC_META_PREFIX}{json_dumps(meta)}")
     return
 
 

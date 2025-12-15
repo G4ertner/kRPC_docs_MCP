@@ -8,7 +8,7 @@
   - `code`: stage-1 ascent script (see code block below)
   - `hard_timeout_sec`: `60`
   - `timeout_sec`: `60`
-  - `unpause_on_start`: `true`
+  - Note: the runner always unpauses on start and pauses on end.
 - **Tool output:** The job log ended with `SyntaxError: invalid syntax` pointing at the stray `SUMMARY:` token, so the script never executed.
 - **Steps to reproduce:**
   1. Submit the Stage 1 ascent script via `start_execute_script_job` as above.
@@ -128,7 +128,7 @@ recommended_next: plan transfer burn once stage plan confirmed
   - `code`: Stage 1 ascent script (see the job resource below)
   - `hard_timeout_sec`: `60`
   - `timeout_sec`: `60`
-  - `unpause_on_start`: `true`
+  - Note: the runner always unpauses on start and pauses on end.
 - **Tool output:** `error: { "message": "Hard timeout reached", "type": "TimeoutError" }` plus `stderr: "TimeoutExpired: hard timeout reached; process killed"`.
 - **Steps to reproduce:**
   1. Launch the same Stage 1 ascent script via `start_execute_script_job` with the constants above (target apoapsis 90 km, while loop cap 220 s, throttle 1.0).
@@ -151,7 +151,7 @@ recommended_next: plan transfer burn once stage plan confirmed
   - `timeout_sec`: `240`
   - `rpc_port`: `50000`
   - `stream_port`: `50001`
-  - `unpause_on_start`: `true`
+  - Note: the runner always unpauses on start and pauses on end.
 - **Tool output:** `get_job_status(job_id)` shows repeated `INFO    Processing request of type CallToolRequest` entries followed by an `Exception in callback` stack trace inside `asyncio.base_events` (lines 88-168) where the server closes sockets, then the job finishes with `error: {"type":"TimeoutError","message":"Hard timeout reached"}` and `stderr: "TimeoutExpired: hard timeout reached; process killed"`. The `result.diagnostics.pre_pause_flight` snapshot shows the vessel at ~100 km altitude, still sub-orbital, confirming the script had not completed and that the callback exception is unrelated to the craft.
 - **Steps to reproduce:**
   1. Issue the Stage 1 ascent script via `start_execute_script_job` (code below) with `hard_timeout_sec = timeout_sec = 240` and default ports.

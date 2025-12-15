@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 import os
 import re
 import sys
@@ -17,6 +16,7 @@ from ..utils.krpc_utils import readers
 from ..utils.krpc_helpers import best_effort_pause
 from ..executors.parsers import split_stdout_and_meta, parse_summary, extract_error_from_stderr
 from ..utils.helper_utils import utc_timestamp
+from ..utils.json_utils import dumps as json_dumps
 from .job_artifacts import save_job_artifact, job_resource_uri
 from .jobs import job_registry
 
@@ -29,8 +29,6 @@ def execute_script_impl(
     name: str | None = None,
     *,
     timeout_sec: float | None = None,
-    pause_on_end: bool = True,
-    unpause_on_start: bool = True,
     allow_imports: bool = False,
     hard_timeout_sec: float | None = None,
 ) -> str:
@@ -52,8 +50,6 @@ def execute_script_impl(
       address/rpc_port/stream_port/name: kRPC connection settings
       timeout_sec: Soft deadline (seconds) injected into the script via check_time().
                   Use None/<=0 to disable the soft deadline.
-      unpause_on_start: Best-effort unpause on start to ensure simulation runs
-      pause_on_end: Attempt to pause KSP when finished (best-effort; may be None)
       allow_imports: Permit `import` statements inside the script (default false)
       hard_timeout_sec: Parent watchdog (seconds). If set, the MCP process will kill the
                         script runner after this time. None disables the hard timeout.
@@ -80,7 +76,7 @@ def execute_script_impl(
       }
 
     Operational behavior:
-      - On start: best-effort unpause (unpause_on_start=true by default) so physics runs.
+      - On start: best-effort unpause so physics runs.
       - On end (success, failure, or exception): best-effort pause; includes `pre_pause_flight`
         with velocities sampled immediately before pausing so speeds are informative.
       - Soft timeout: your script should call `check_time()` inside loops; on TimeoutError
@@ -95,7 +91,6 @@ def execute_script_impl(
 
     Notes:
       - `vessel` may be None depending on the scene (e.g., KSC/Tracking Station). Guard accordingly.
-      - `pause_on_end` is best-effort and may be None on some kRPC versions.
       - The `transcript` includes stderr so exceptions are visible alongside prints/logs.
     """
     result = _run_execute_script(
@@ -105,12 +100,10 @@ def execute_script_impl(
         stream_port=stream_port,
         name=name,
         timeout_sec=timeout_sec,
-        pause_on_end=pause_on_end,
-        unpause_on_start=unpause_on_start,
         allow_imports=allow_imports,
         hard_timeout_sec=hard_timeout_sec,
     )
-    return json.dumps(result)
+    return json_dumps(result)
 
 def start_execute_script_job_impl(
     code: str,
@@ -120,8 +113,6 @@ def start_execute_script_job_impl(
     name: str | None = None,
     *,
     timeout_sec: float | None = None,
-    pause_on_end: bool = True,
-    unpause_on_start: bool = True,
     allow_imports: bool = False,
     hard_timeout_sec: float | None = None,
 ) -> dict:
@@ -142,8 +133,6 @@ def start_execute_script_job_impl(
         "stream_port": stream_port,
         "name": name,
         "timeout_sec": timeout_sec,
-        "pause_on_end": pause_on_end,
-        "unpause_on_start": unpause_on_start,
         "allow_imports": allow_imports,
         "hard_timeout_sec": hard_timeout_sec,
     }
@@ -161,6 +150,18 @@ def start_execute_script_job_impl(
         artifact = save_job_artifact(handle.job_id, artifact_payload)
         handle.set_result_resource(job_resource_uri(handle.job_id))
         handle.log(f"[execute_script] artifact ready at {artifact}")
+        if not bool(result.get("ok")):
+            err = result.get("error")
+            if isinstance(err, dict):
+                err_type = err.get("type") or "ScriptError"
+                err_msg = err.get("message") or "script returned ok=false"
+                message = f"{err_type}: {err_msg}"
+            elif err:
+                message = str(err)
+            else:
+                message = "script returned ok=false"
+            handle.log(f"[execute_script] marking job FAILED ({message})")
+            raise RuntimeError(message)
 
     job_id = job_registry.create_job(job_fn, metadata={"kind": "execute_script"})
     return {
@@ -234,8 +235,6 @@ def _run_execute_script(
     stream_port: int,
     name: str | None,
     timeout_sec: float | None,
-    pause_on_end: bool,
-    unpause_on_start: bool,
     allow_imports: bool,
     hard_timeout_sec: float | None,
     job_handle: Any | None = None,
@@ -253,8 +252,9 @@ def _run_execute_script(
             "name": name,
             "timeout_sec": (None if (timeout_sec is None or float(timeout_sec) <= 0) else float(timeout_sec)),
             "allow_imports": bool(allow_imports),
-            "pause_on_end": bool(pause_on_end),
-            "unpause_on_start": bool(unpause_on_start),
+            # Always unpause -> run user code -> pause, so scripts can reliably manipulate flight state.
+            "pause_on_end": True,
+            "unpause_on_start": True,
         }
         cfg["timeout_sec"], hard_timeout_sec = _resolve_timeouts(
             cfg["timeout_sec"],
@@ -267,7 +267,7 @@ def _run_execute_script(
         except Exception:
             py = "python"
 
-        cmd = [py, "-m", "mcp_server.executors.runner", json.dumps(cfg)]
+        cmd = [py, "-m", "mcp_server.executors.runner", json_dumps(cfg)]
         try:
             proc = subprocess.Popen(
                 cmd,

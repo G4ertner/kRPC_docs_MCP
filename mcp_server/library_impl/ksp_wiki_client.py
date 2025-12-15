@@ -29,11 +29,40 @@ _LANG_CODE_RE = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2})?$")
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)\b[^>]*>.*?</\1>")
 
 
 def _strip_html(text: str) -> str:
-    # Remove tags and decode HTML entities
-    return html.unescape(_TAG_RE.sub("", text or "")).strip()
+    """Convert small MediaWiki HTML fragments to readable plain text."""
+    if not text:
+        return ""
+    text = _SCRIPT_STYLE_RE.sub("", text)
+    # Preserve some structure before removing tags.
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</p\s*>", "\n\n", text)
+    text = re.sub(r"(?i)</h[1-6]\s*>", "\n\n", text)
+    text = re.sub(r"(?i)<h[1-6]\b[^>]*>", "\n\n", text)
+    text = re.sub(r"(?i)</li\s*>", "\n", text)
+    text = re.sub(r"(?i)<li\b[^>]*>", "- ", text)
+    text = re.sub(r"(?i)</tr\s*>", "\n", text)
+    text = re.sub(r"(?i)</div\s*>", "\n", text)
+
+    # Remove remaining tags and decode entities.
+    text = html.unescape(_TAG_RE.sub("", text))
+
+    # Normalize whitespace but keep paragraph breaks.
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in text.splitlines()]
+    out_lines: list[str] = []
+    prev_blank = True
+    for ln in lines:
+        if not ln:
+            if not prev_blank:
+                out_lines.append("")
+            prev_blank = True
+            continue
+        out_lines.append(ln)
+        prev_blank = False
+    return "\n".join(out_lines).strip()
 
 
 def _title_to_path(title: str) -> str:
@@ -103,7 +132,26 @@ class KspWikiClient:
         return results
 
     def get_page(self, title: str) -> Optional[str]:
-        # Try action=query extracts first
+        # Preferred: action=parse returns article HTML (not full page chrome).
+        params = {
+            "action": "parse",
+            "page": title,
+            "prop": "text",
+            "redirects": 1,
+            "format": "json",
+            "formatversion": 2,
+        }
+        r = self.session.get(API, params=params, timeout=self.timeout)
+        if r.status_code == 200:
+            data = r.json() or {}
+            html_text = (data.get("parse", {}).get("text", "") or "")
+            if isinstance(html_text, str):
+                parsed = _strip_html(html_text)
+                if parsed:
+                    time.sleep(self.throttle)
+                    return parsed
+
+        # Fallback: action=query extracts (some wikis have this extension enabled).
         params = {
             "action": "query",
             "prop": "extracts",
@@ -125,10 +173,14 @@ class KspWikiClient:
                     time.sleep(self.throttle)
                     return str(extract)
 
-        # Fallback: REST plain endpoint
+        # Fallback: REST plain endpoint (if supported by the wiki).
         rest_url = f"{REST_PLAIN}/{_title_to_path(title)}"
         r2 = self.session.get(rest_url, timeout=self.timeout)
         if r2.status_code == 200:
+            # Some servers respond with the Main Page HTML here; reject that.
+            head = (r2.text or "")[:800].lower()
+            if "<!doctype html" in head or "<html" in head:
+                return None
             time.sleep(self.throttle)
             return r2.text
         return None

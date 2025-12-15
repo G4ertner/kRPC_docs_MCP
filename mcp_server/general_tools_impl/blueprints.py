@@ -2,29 +2,49 @@ from __future__ import annotations
 
 import base64
 import datetime as _dt
-import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ..utils.krpc_utils import readers
 from ..utils.krpc_utils.client import connect_to_game
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
-_LATEST_BLUEPRINT_JSON: str | None = None
+_LATEST_STAGING_JSON: str | None = None
+_LATEST_VESSEL_BLUEPRINT_JSON: str | None = None
 _LAST_SVG: str | None = None
 _LAST_PNG: bytes | None = None
+_BLUEPRINT_DIR = Path.cwd() / "artifacts" / "blueprints"
+_EXPORTED_FILES: dict[str, Path] = {}
 
 
-def set_latest_blueprint(bp: Dict[str, Any] | str) -> None:
-    global _LATEST_BLUEPRINT_JSON
-    if isinstance(bp, str):
-        _LATEST_BLUEPRINT_JSON = bp
+def _register_exported_file(path: Path) -> None:
+    # Store by basename to avoid path traversal through the resource route.
+    _EXPORTED_FILES[path.name] = path
+
+
+def _set_latest_json(cache_key: str, payload: Dict[str, Any] | str) -> None:
+    global _LATEST_STAGING_JSON, _LATEST_VESSEL_BLUEPRINT_JSON
+    try:
+        json_payload = payload if isinstance(payload, str) else json_dumps(payload)
+    except Exception:
+        json_payload = json_dumps({"error": f"Failed to serialize {cache_key} payload"})
+
+    if cache_key == "staging":
+        _LATEST_STAGING_JSON = json_payload
+    elif cache_key == "vessel_blueprint":
+        _LATEST_VESSEL_BLUEPRINT_JSON = json_payload
     else:
-        try:
-            _LATEST_BLUEPRINT_JSON = json.dumps(bp)
-        except Exception:
-            _LATEST_BLUEPRINT_JSON = json.dumps({"error": "Failed to serialize blueprint"})
+        raise ValueError(f"Unknown cache_key: {cache_key}")
+
+
+def set_latest_staging(stage_plan: Dict[str, Any] | str) -> None:
+    _set_latest_json("staging", stage_plan)
+
+
+def set_latest_vessel_blueprint(bp: Dict[str, Any] | str) -> None:
+    _set_latest_json("vessel_blueprint", bp)
 
 
 def set_last_diagram(*, svg: str | None, png_bytes: bytes | None) -> None:
@@ -33,8 +53,12 @@ def set_last_diagram(*, svg: str | None, png_bytes: bytes | None) -> None:
     _LAST_PNG = png_bytes
 
 
-def get_latest_blueprint() -> str:
-    return _LATEST_BLUEPRINT_JSON or json.dumps({"error": "No cached blueprint. Call get_vessel_blueprint first."})
+def get_latest_staging() -> str:
+    return _LATEST_STAGING_JSON or json_dumps({"error": "No cached staging JSON. Call get_stage_plan or export_blueprint_diagram first."})
+
+
+def get_latest_vessel_blueprint() -> str:
+    return _LATEST_VESSEL_BLUEPRINT_JSON or json_dumps({"error": "No cached vessel blueprint. Call get_vessel_blueprint first."})
 
 
 def get_last_svg() -> str:
@@ -44,11 +68,33 @@ def get_last_svg() -> str:
 def get_last_png() -> str:
     if _LAST_PNG is None:
         return "(no PNG diagram cached; call export_blueprint_diagram with format='png' or 'both')"
-    b64 = json.dumps({
+    b64 = json_dumps({
         "mime": "image/png",
         "data_base64": base64.b64encode(_LAST_PNG).decode('ascii'),
     })
     return b64
+
+
+def resource_payload_for(filename: str) -> str:
+    safe_name = Path(filename).name
+    path = _EXPORTED_FILES.get(safe_name) or (_BLUEPRINT_DIR / safe_name)
+    if not path.exists():
+        return json_dumps({"error": f"Blueprint diagram '{safe_name}' not found. Call export_blueprint_diagram first."})
+
+    suffix = path.suffix.lower()
+    if suffix == ".svg":
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception:
+            return path.read_text()
+    if suffix == ".png":
+        data = path.read_bytes()
+        return json_dumps({
+            "filename": safe_name,
+            "mime": "image/png",
+            "data_base64": base64.b64encode(data).decode("ascii"),
+        })
+    return json_dumps({"error": f"Unsupported blueprint diagram format '{suffix}'.", "filename": safe_name})
 
 
 def export_blueprint_diagram(
@@ -102,7 +148,7 @@ def export_blueprint_diagram(
     except Exception:
         pass
 
-    base_dir = Path(out_dir or Path("artifacts") / "blueprints")
+    base_dir = Path(out_dir) if out_dir else _BLUEPRINT_DIR
     base_dir.mkdir(parents=True, exist_ok=True)
     timestamp = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
 
@@ -110,21 +156,25 @@ def export_blueprint_diagram(
     svg_data = _make_svg_fast(meta, stages, counts_by_stage)
     svg_path = base_dir / f"blueprint_{timestamp}.svg"
     svg_path.write_text(svg_data, encoding="utf-8")
+    _register_exported_file(svg_path)
     result["saved_path_svg"] = str(svg_path)
     result["uri_svg"] = f"resource://blueprints/{svg_path.name}"
+    result["uri_last_svg"] = "resource://blueprints/last-diagram.svg"
 
     png_path = None
     if format in {"png", "both"}:
         png_path = base_dir / f"blueprint_{timestamp}.png"
         if _try_png_fast(meta, stages, counts_by_stage, png_path):
+            _register_exported_file(png_path)
             result["saved_path_png"] = str(png_path)
             result["uri_png"] = f"resource://blueprints/{png_path.name}"
+            result["uri_last_png"] = "resource://blueprints/last-diagram.png"
         else:
             result["note"] = result.get("note", "") + " PNG generation failed (missing Pillow)."
 
-    set_latest_blueprint(stage_plan)
+    set_latest_staging(stage_plan)
     set_last_diagram(svg=svg_data, png_bytes=png_path.read_bytes() if png_path and png_path.exists() else None)
-    return json.dumps(result)
+    return json_dumps(result)
 
 
 def _make_svg_fast(meta: Dict[str, Any], stages: List[Dict[str, Any]], counts_by_stage: Dict[Any, Dict[str, int]]) -> str:

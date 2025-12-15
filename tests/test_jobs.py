@@ -69,3 +69,24 @@ def test_cancel_job_marks_state_and_runs_callback():
     assert state.status is JobStatus.CANCELLED
     assert callback_triggered
     registry.shutdown()
+
+
+def test_job_handle_exposes_cancel_requested_flag():
+    registry = JobRegistry(max_workers=1)
+    stop_event = threading.Event()
+
+    def job(handle):
+        while not stop_event.is_set():
+            if handle.is_cancel_requested():
+                stop_event.set()
+                return
+            time.sleep(0.01)
+
+    job_id = registry.create_job(job)
+    resp = registry.cancel_job(job_id)
+    assert resp["ok"]
+    registry.wait_for(job_id, timeout=5)
+    state = registry.get_state(job_id)
+    assert state is not None
+    assert state.status is JobStatus.CANCELLED
+    registry.shutdown()

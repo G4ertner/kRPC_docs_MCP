@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from collections import deque
 from typing import Callable, Deque, Sequence
@@ -17,6 +16,7 @@ from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
 from mcp.types import ContentBlock, TextContent
 
 from .utils.async_utils import run_blocking
+from .utils.json_utils import dumps as json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ def append_injection_to_result(
         return merged, _inject_into_structured(structured)
 
     if isinstance(result, dict):
-        base_text = json.dumps(result, indent=2)
+        base_text = json_dumps(result, indent=2)
         merged = _merge_injection_into_content([TextContent(type="text", text=base_text)], message)
         return merged, _inject_into_structured(result)
 
@@ -171,6 +171,7 @@ class InjectionAwareToolManager(ToolManager):
         no_timeout_tools = {
             "start_part_tree_job",
             "start_stage_plan_job",
+            "start_warp_job",
             "start_execute_script_job",
             "execute_script",
         }

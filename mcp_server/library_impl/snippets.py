@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
+from ..utils.json_utils import dumps as json_dumps
 from .snippets_runtime import (
     KeywordConfig,
     KeywordIndex,
@@ -179,7 +180,7 @@ def snippets_search_impl(query: str, k: int = 10, mode: str = "keyword", and_log
     else:
         items = _hybrid_search(query, k, and_logic, category, exclude_restricted, rerank)
         src = {"mode": "hybrid", "index": str(_default_paths()["keyword_index"]) }
-    return json.dumps({"items": items, "source": src})
+    return json_dumps({"items": items, "source": src})
 
 
 def snippets_get_impl(id: str, include_code: bool = False) -> str:
@@ -194,8 +195,8 @@ def snippets_get_impl(id: str, include_code: bool = False) -> str:
             if not include_code:
                 # Normalize hidden code to empty string for predictable consumers.
                 out["code"] = ""
-            return json.dumps({"ok": True, "snippet": out})
-    return json.dumps({"ok": False, "error": f"id not found: {id}"})
+            return json_dumps({"ok": True, "snippet": out})
+    return json_dumps({"ok": False, "error": f"id not found: {id}"})
 
 
 def snippets_resolve_impl(id: str | None = None, name: str | None = None, max_bytes: int = 25000, max_nodes: int = 25) -> str:
@@ -205,7 +206,7 @@ def snippets_resolve_impl(id: str | None = None, name: str | None = None, max_by
     Returns JSON: { ok, bundle_code?, include_ids?, unresolved?, truncated?, stats? }.
     """
     if not id and not name:
-        return json.dumps({"ok": False, "error": "Provide id or name"})
+        return json_dumps({"ok": False, "error": "Provide id or name"})
     try:
         res = runtime_resolve_snippet(
             target_id=id,
@@ -214,7 +215,7 @@ def snippets_resolve_impl(id: str | None = None, name: str | None = None, max_by
             size_cap_bytes=int(max_bytes),
             size_cap_nodes=int(max_nodes),
         )
-        return json.dumps({
+        return json_dumps({
             "ok": True,
             "bundle_code": res.bundle_code,
             "include_ids": res.include_ids,
@@ -223,7 +224,7 @@ def snippets_resolve_impl(id: str | None = None, name: str | None = None, max_by
             "stats": res.stats,
         })
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return json_dumps({"ok": False, "error": str(e)})
 
 
 def snippets_search_and_resolve_impl(query: str, k: int = 10, mode: str = "hybrid", rerank: bool = False, and_logic: bool = False, category: str | None = None, exclude_restricted: bool = False, max_bytes: int = 25000, max_nodes: int = 25) -> str:
@@ -234,12 +235,12 @@ def snippets_search_and_resolve_impl(query: str, k: int = 10, mode: str = "hybri
     """
     items = json.loads(snippets_search_impl(query, k=k, mode=mode, and_logic=and_logic, category=category, exclude_restricted=exclude_restricted, rerank=rerank)).get("items", [])
     if not items:
-        return json.dumps({"ok": False, "error": "No results"})
+        return json_dumps({"ok": False, "error": "No results"})
     top = items[0]
     rid = top.get("id")
     res = json.loads(snippets_resolve_impl(id=rid, name=None, max_bytes=max_bytes, max_nodes=max_nodes))
     res["top"] = top
-    return json.dumps(res)
+    return json_dumps(res)
 
 
 # ---------- Resource ----------

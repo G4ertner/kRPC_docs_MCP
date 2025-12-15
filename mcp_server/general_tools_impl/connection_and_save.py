@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import secrets
 
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import best_effort_pause, open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 from ..utils.krpc_utils.client import KRPCConnectionError
@@ -105,9 +105,9 @@ def save_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
     save_name = f"{base}_{rid}"
     try:
         sc.save(save_name)
-        return json.dumps({"ok": True, "save_name": save_name})
+        return json_dumps({"ok": True, "save_name": save_name})
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return json_dumps({"ok": False, "error": str(e)})
     finally:
         try:
             conn.close()
@@ -125,18 +125,18 @@ def load_llm_checkpoint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
     Returns JSON: { ok, loaded?: save_name, error? }.
     """
     if not save_name:
-        return json.dumps({"ok": False, "error": "Provide save_name"})
+        return json_dumps({"ok": False, "error": "Provide save_name"})
     if require_llm_prefix and not save_name.startswith("LLM_"):
-        return json.dumps({"ok": False, "error": "Refusing to load non-LLM save (set require_llm_prefix=false to override)"})
+        return json_dumps({"ok": False, "error": "Refusing to load non-LLM save (set require_llm_prefix=false to override)"})
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     sc = conn.space_center
     try:
         sc.load(save_name)
         if pause_after:
             best_effort_pause(conn)
-        return json.dumps({"ok": True, "loaded": save_name})
+        return json_dumps({"ok": True, "loaded": save_name})
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return json_dumps({"ok": False, "error": str(e)})
     finally:
         try:
             conn.close()

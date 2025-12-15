@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -24,7 +23,7 @@ def list_launch_sites(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
             except Exception:
                 iterable = raw
             names = [getattr(s, "name", str(s)) for s in iterable]
-        return json.dumps({"launch_sites": names})
+        return json_dumps({"launch_sites": names})
     finally:
         try:
             conn.close()
@@ -40,9 +39,9 @@ def list_launchable_vessels(address: str = DEFAULT_KRPC_ADDRESS, craft_directory
     try:
         sc = conn.space_center
         items = list(sc.launchable_vessels(craft_directory) or [])
-        return json.dumps({"craft_directory": craft_directory, "vessels": items})
+        return json_dumps({"craft_directory": craft_directory, "vessels": items})
     except Exception as e:
-        return json.dumps({"craft_directory": craft_directory, "error": str(e)})
+        return json_dumps({"craft_directory": craft_directory, "error": str(e)})
     finally:
         try:
             conn.close()
@@ -77,9 +76,9 @@ def launch_vessel(address: str = DEFAULT_KRPC_ADDRESS, craft_directory: str = "V
             av = sc.active_vessel.name
         except Exception:
             av = None
-        return json.dumps({"ok": True, "active_vessel": av, "launch_site": launch_site})
+        return json_dumps({"ok": True, "active_vessel": av, "launch_site": launch_site})
     except Exception as e:
-        return json.dumps({"ok": False, "error": str(e)})
+        return json_dumps({"ok": False, "error": str(e)})
     finally:
         try:
             conn.close()
@@ -95,4 +94,4 @@ def list_vessels(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, str
       JSON array: { name, type?, situation?, distance_m? }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.list_vessels(conn))
+    return json_dumps(readers.list_vessels(conn))

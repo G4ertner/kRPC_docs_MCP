@@ -623,7 +623,9 @@ Capture a PNG screenshot of the current scene and return it as base64 along with
 
 Notes:
   - Requires the MCP server and KSP to run on the same PC (localhost/127.0.0.1/::1) so the saved file is accessible.
-  - LLM: After calling, fetch/render the returned resource URI (or resource://screenshots/latest) via read_resource/view_image so you actually see the image in chat.
+  - Filenames are unique per call (safe to call in fast loops).
+  - LLM: To view the screenshot, use the returned `resource_uri` (resource://screenshots/<filename>) or `resource://screenshots/latest`.
+    The file is also saved on disk at `saved_path` (usually `artifacts/screenshots/<filename>`).
 
 Args:
   scale: Resolution scaling factor forwarded to SpaceCenter.screenshot (1-4).

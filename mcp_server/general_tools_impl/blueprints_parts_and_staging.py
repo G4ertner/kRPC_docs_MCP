@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
-
-from .blueprints import set_latest_blueprint
+from .blueprints import set_latest_vessel_blueprint
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -23,7 +22,7 @@ def get_part_tree(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, st
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.part_tree(conn))
+        return json_dumps(readers.part_tree(conn))
     finally:
         try:
             conn.close()
@@ -46,10 +45,10 @@ def get_vessel_blueprint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50
         bp = readers.vessel_blueprint(conn)
         try:
             # Cache for blueprint resource
-            set_latest_blueprint(bp)
+            set_latest_vessel_blueprint(bp)
         except Exception:
             pass
-        return json.dumps(bp)
+        return json_dumps(bp)
     finally:
         try:
             conn.close()
@@ -102,7 +101,7 @@ def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
     if env not in ("current", "sea_level", "vacuum"):
         env = "current"
     try:
-        return json.dumps(readers.stage_plan_approx(conn, environment=env))
+        return json_dumps(readers.stage_plan_approx(conn, environment=env))
     finally:
         try:
             conn.close()
@@ -125,7 +124,7 @@ def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000,
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.staging_info(conn))
+        return json_dumps(readers.staging_info(conn))
     finally:
         try:
             conn.close()

@@ -117,7 +117,8 @@ def test_start_execute_script_job_creates_artifact(monkeypatch, tmp_path: Path):
             "pre_pause_flight": None,
         }
 
-    monkeypatch.setattr(executor_tools, "_run_execute_script", fake_run_execute_script)
+    # Patch the core runner used by the job function.
+    monkeypatch.setattr("mcp_server.executor_impl.core._run_execute_script", fake_run_execute_script)
 
     payload = json.loads(
         executor_tools.start_execute_script_job(
@@ -140,6 +141,54 @@ def test_start_execute_script_job_creates_artifact(monkeypatch, tmp_path: Path):
     assert artifact.exists()
     data = json.loads(artifact.read_text())
     assert data["kind"] == "execute_script"
+
+
+def test_start_execute_script_job_marks_failed_when_script_result_not_ok(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr("mcp_server.executor_tools.job_artifacts.JOB_ARTIFACTS_DIR", tmp_path, raising=False)
+
+    def fake_run_execute_script(**kwargs):
+        handle = kwargs.pop("job_handle", None)
+        assert handle is not None
+        handle.log("[stderr] ZeroDivisionError: float division by zero")
+        return {
+            "ok": False,
+            "summary": None,
+            "transcript": "Traceback (most recent call last): ...",
+            "stdout": "",
+            "stderr": "ZeroDivisionError: float division by zero",
+            "error": {"type": "ZeroDivisionError", "message": "float division by zero"},
+            "paused": True,
+            "unpaused": False,
+            "timing": {"exec_time_s": 0.1},
+            "pre_pause_flight": None,
+            "follow_up": {"suggest_get_diagnostics": True},
+        }
+
+    # Patch the core runner used by the job function.
+    monkeypatch.setattr("mcp_server.executor_impl.core._run_execute_script", fake_run_execute_script)
+
+    payload = json.loads(
+        executor_tools.start_execute_script_job(
+            "1/0",
+            "127.0.0.1",
+            rpc_port=50000,
+            stream_port=50001,
+            name="Test",
+        )
+    )
+    job_id = payload["job_id"]
+    _wait_for_completion(job_id)
+
+    state = job_registry.get_state(job_id)
+    assert state is not None
+    assert state.status is JobStatus.FAILED
+    assert state.result_resource == job_resource_uri(job_id)
+
+    artifact = job_artifact_path(job_id)
+    assert artifact.exists()
+    data = json.loads(artifact.read_text())
+    assert data["kind"] == "execute_script"
+    assert data["result"]["ok"] is False
 
 
 def test_resolve_timeouts_preserves_soft_and_bumps_hard_when_needed():

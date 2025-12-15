@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -28,7 +27,7 @@ def compute_burn_time(address: str = DEFAULT_KRPC_ADDRESS, dv_m_s: float | None 
     if env not in ("current", "sea_level", "vacuum"):
         env = "current"
     try:
-        return json.dumps(readers.compute_burn_time(conn, dv_m_s=dv_m_s, environment=env))
+        return json_dumps(readers.compute_burn_time(conn, dv_m_s=dv_m_s, environment=env))
     finally:
         try:
             conn.close()
@@ -51,7 +50,7 @@ def compute_circularize_node(address: str = DEFAULT_KRPC_ADDRESS, at: str = "apo
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.propose_circularize_node(conn, at=at))
+        return json_dumps(readers.propose_circularize_node(conn, at=at))
     finally:
         try:
             conn.close()
@@ -70,7 +69,7 @@ def compute_plane_change_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: in
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.propose_plane_change_nodes(conn))
+        return json_dumps(readers.propose_plane_change_nodes(conn))
     finally:
         try:
             conn.close()
@@ -95,7 +94,7 @@ def compute_raise_lower_node(address: str = DEFAULT_KRPC_ADDRESS, kind: str | No
         raise ValueError("target_alt_m is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.propose_raise_lower_node(conn, kind=kind, target_alt_m=target_alt_m))
+        return json_dumps(readers.propose_raise_lower_node(conn, kind=kind, target_alt_m=target_alt_m))
     finally:
         try:
             conn.close()
@@ -115,7 +114,7 @@ def compute_rendezvous_phase_node(address: str = DEFAULT_KRPC_ADDRESS, rpc_port:
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.propose_rendezvous_phase_node(conn))
+        return json_dumps(readers.propose_rendezvous_phase_node(conn))
     finally:
         try:
             conn.close()
@@ -137,7 +136,7 @@ def compute_transfer_window_to_body(address: str = DEFAULT_KRPC_ADDRESS, body_na
         raise ValueError("body_name is required")
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.propose_transfer_window_to_body(conn, target_body_name=body_name))
+        return json_dumps(readers.propose_transfer_window_to_body(conn, target_body_name=body_name))
     finally:
         try:
             conn.close()
@@ -169,7 +168,7 @@ def compute_ejection_node_to_body(address: str = DEFAULT_KRPC_ADDRESS, body_name
     if env not in ("current", "sea_level", "vacuum"):
         env = "current"
     try:
-        return json.dumps(readers.propose_ejection_node_to_body(conn, target_body_name=body_name, parking_alt_m=parking_alt_m, environment=env))
+        return json_dumps(readers.propose_ejection_node_to_body(conn, target_body_name=body_name, parking_alt_m=parking_alt_m, environment=env))
     finally:
         try:
             conn.close()

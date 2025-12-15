@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
 import threading
+import time
 from pathlib import Path
 from typing import Dict, List
 
 from ..executor_tools.jobs import JobStatus, job_registry
+from ..utils.json_utils import dumps as json_dumps
 from krpc_index import KRPCSearchIndex, load_dataset
 
 
@@ -132,6 +133,17 @@ def get_job_status_impl(job_id: str) -> dict:
     payload = state.as_dict()
     payload.setdefault("log_stream_warning", False)
     payload["ok"] = state.status not in (JobStatus.FAILED, JobStatus.CANCELLED)
+
+    # Add wall-time counters (useful for long-running jobs like warps).
+    try:
+        now = time.time()
+        if state.started_at is not None and state.finished_at is None:
+            payload["wall_time_elapsed_s"] = max(0.0, now - float(state.started_at))
+        elif state.started_at is not None and state.finished_at is not None:
+            payload["wall_time_total_s"] = max(0.0, float(state.finished_at) - float(state.started_at))
+    except Exception:
+        pass
+
     payload["logs"], payload["log_cursor"] = _consume_incremental_logs(job_id, payload["logs"])
     return payload
 
@@ -147,4 +159,4 @@ def cancel_job_impl(job_id: str, reason: str | None = None) -> str:
         JSON: { ok: bool, message: str }
     """
     result = job_registry.cancel_job(job_id, reason or "Cancelled by user request.")
-    return json.dumps(result)
+    return json_dumps(result)

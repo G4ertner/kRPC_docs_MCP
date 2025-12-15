@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 import re
 from pathlib import Path
@@ -12,11 +11,17 @@ if __package__ in (None, ""):
         sys.path.insert(0, repo_root_str)
     from mcp_server.mcp_context import mcp
     from mcp_server.library_impl import krpc_docs, ksp_wiki, snippets
-    from mcp_server.general_tools_impl.status_and_time import _orbital_ascent_monitor
+    from mcp_server.general_tools_impl.status_and_time import _orbital_ascent_monitor, _warp_monitor
+    from mcp_server.utils.ansi_utils import strip_ansi
+    from mcp_server.utils.json_utils import dumps as json_dumps
+    from mcp_server.utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 else:
     from .mcp_context import mcp
     from .library_impl import krpc_docs, ksp_wiki, snippets
-    from .general_tools_impl.status_and_time import _orbital_ascent_monitor
+    from .general_tools_impl.status_and_time import _orbital_ascent_monitor, _warp_monitor
+    from .utils.ansi_utils import strip_ansi
+    from .utils.json_utils import dumps as json_dumps
+    from .utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
 
 def _copy_doc(target, source):
@@ -41,6 +46,19 @@ def _split_job_id(requested_job_id: str) -> tuple[str, str]:
     if not match:
         return requested_job_id, ""
     return match.group(1), match.group(2)
+
+
+def _parse_job_id_suffix(suffix: str) -> set[str]:
+    """
+    Parse a suffix like '_asc_raw' into {'_asc', '_raw'}.
+
+    Suffix is an out-of-band convention used by some tools to request extra
+    payloads or toggle log formatting for get_job_status polling.
+    """
+    if not suffix:
+        return set()
+    parts = [p for p in suffix.split("_") if p]
+    return {f"_{part}" for part in parts}
 
 
 @mcp.tool()
@@ -95,23 +113,78 @@ def get_job_status(job_id: str) -> str:
             - error: error description when failed or unknown
             - metadata: any job-specific metadata stored at creation time
             - ok: boolean convenience flag (false when FAILED, CANCELLED, or UNKNOWN)
+        Notes:
+            - Logs are returned with ANSI escape sequences stripped by default for easier parsing.
+            - To return raw logs, append the suffix "_raw" to the job_id (e.g., "<id>_raw").
+            - To include live warp telemetry + ETA (best-effort), append the suffix "_warp" (e.g., "<id>_warp").
     """
 
     requested_job_id = job_id
     canonical_job_id, suffix = _split_job_id(requested_job_id)
+    suffix_flags = _parse_job_id_suffix(suffix)
+
+    base_payload = krpc_docs.get_job_status_impl(job_id=canonical_job_id)
 
     # Optional extra telemetry payload requested via suffix convention.
     extra: dict = {}
-    if suffix == "_asc":
+    if "_asc" in suffix_flags:
         extra["game_logging"] = _orbital_ascent_monitor()
 
-    payload = krpc_docs.get_job_status_impl(job_id=canonical_job_id) | extra
+    if "_warp" in suffix_flags:
+        # Best-effort extra payload for warp jobs (and for debugging warp state generally).
+        try:
+            target_ut = None
+            try:
+                meta = base_payload.get("metadata") or {}
+                if isinstance(meta, dict) and meta.get("kind") == "warp":
+                    params = meta.get("params") or {}
+                    if isinstance(params, dict) and params.get("ut") is not None:
+                        ut = float(params["ut"])
+                        lead = float(params.get("lead_time_s") or 0.0)
+                        target_ut = ut - max(0.0, lead)
+            except Exception:
+                target_ut = None
+
+            addr = DEFAULT_KRPC_ADDRESS
+            rpc = 50000
+            stream = 50001
+            nm = None
+            timeout = 2.0
+            try:
+                if isinstance(base_payload.get("metadata"), dict):
+                    params = (base_payload["metadata"].get("params") or {}) if isinstance(base_payload["metadata"].get("params"), dict) else {}
+                    addr = params.get("address", addr)
+                    rpc = int(params.get("rpc_port", rpc))
+                    stream = int(params.get("stream_port", stream))
+                    nm = params.get("name", nm)
+                    timeout = float(params.get("timeout", timeout))
+            except Exception:
+                pass
+
+            extra["warp_progress"] = _warp_monitor(
+                address=addr,
+                rpc_port=rpc,
+                stream_port=stream,
+                name=nm,
+                timeout=min(2.0, timeout),
+                target_ut=target_ut,
+            )
+        except Exception as exc:
+            extra["warp_progress_error"] = str(exc)
+
+    payload = base_payload | extra
+
+    if "_raw" not in suffix_flags:
+        payload["logs"] = [strip_ansi(line) for line in payload.get("logs", [])]
+        payload["logs_sanitized"] = True
+    else:
+        payload["logs_sanitized"] = False
 
     # Echo the exact identifier the caller used, but also expose the canonical id.
     payload["job_id"] = requested_job_id
     payload["canonical_job_id"] = canonical_job_id
     payload["job_id_suffix"] = suffix
-    return json.dumps(payload)
+    return json_dumps(payload)
 
 
  

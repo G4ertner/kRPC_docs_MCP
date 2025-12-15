@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -20,7 +19,7 @@ def get_power_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000,
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.power_status(conn))
+        return json_dumps(readers.power_status(conn))
     finally:
         try:
             conn.close()
@@ -40,7 +39,7 @@ def get_resource_breakdown(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.resource_breakdown(conn))
+        return json_dumps(readers.resource_breakdown(conn))
     finally:
         try:
             conn.close()

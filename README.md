@@ -131,7 +131,8 @@ get_launch_ascent_circ_playbook - (resource://playbooks/launch-ascent-circulariz
 get_state_checkpoint_playbook - (resource://playbooks/state-checkpoint-rollback)
 get_orbital_return_playbook - (resource://playbooks/orbital-return-playbook)
 get_scribe_master_prompt_resource - (resource://prompts/scribe-master)
-get_latest_blueprint - (resource://blueprints/latest)
+get_latest_staging - (resource://staging/latest)
+get_latest_vessel_blueprint - (resource://vessel-blueprint/latest)
 get_last_svg - (resource://blueprints/last-diagram.svg)
 get_last_png - (resource://blueprints/last-diagram.png)
 get_snippets_usage — (resource://snippets/usage)
@@ -185,7 +186,7 @@ On top of that, the MCP server comes with a whole set of hardcoded tools your LL
 - `set_sas_mode` — Enable SAS and pick navball hold mode (prograde/retrograde/etc.).
 - `get_action_groups_status` — Action group toggles.
 - `get_camera_status` — Camera mode and parameters.
-- `get_screenshot` — Captures a PNG screenshot (localhost-only) and returns base64 + a reusable resource URI.
+- `get_screenshot` — Captures a PNG screenshot (localhost-only), saves it under `artifacts/screenshots/`, and returns base64 + a reusable resource URI (or `resource://screenshots/latest`).
 
 #### 🌬️ Aerodynamics & Engines
 - `get_aero_status` — Dynamic pressure, Mach, density, drag/lift.

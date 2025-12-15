@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -27,7 +26,7 @@ def get_environment_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.environment_info(conn))
+        return json_dumps(readers.environment_info(conn))
     finally:
         try:
             conn.close()
@@ -45,4 +44,4 @@ def get_surface_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000,
       slope_deg, ground_speed_m_s, body }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.surface_info(conn))
+    return json_dumps(readers.surface_info(conn))

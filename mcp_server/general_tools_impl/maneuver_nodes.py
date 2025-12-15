@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import (
-    best_effort_pause,
-    best_effort_paused_state,
-    best_effort_unpause,
     open_connection,
 )
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
+from ..executor_impl import job_tools
 
 
 def list_maneuver_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
@@ -24,7 +21,7 @@ def list_maneuver_nodes(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.maneuver_nodes_basic(conn))
+        return json_dumps(readers.maneuver_nodes_basic(conn))
     finally:
         try:
             conn.close()
@@ -41,7 +38,7 @@ def list_maneuver_nodes_detailed(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: 
       burn_time_simple_s? }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.maneuver_nodes_detailed(conn))
+    return json_dumps(readers.maneuver_nodes_detailed(conn))
 
 
 def set_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, prograde: float = 0.0, normal: float = 0.0, radial: float = 0.0, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
@@ -67,7 +64,7 @@ def set_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = No
     ctrl = conn.space_center.active_vessel.control
     try:
         node = ctrl.add_node(ut, prograde, normal, radial)
-        return json.dumps({
+        return json_dumps({
             "ut": getattr(node, 'ut', ut),
             "prograde": prograde,
             "normal": normal,
@@ -104,7 +101,7 @@ def update_maneuver_node(address: str = DEFAULT_KRPC_ADDRESS, node_index: int = 
             n.normal = normal
         if radial is not None:
             n.radial = radial
-        return json.dumps({
+        return json_dumps({
             "index": idx,
             "ut": getattr(n, 'ut', ut),
             "prograde": getattr(n, 'prograde', prograde),
@@ -155,40 +152,28 @@ def warp_to(address: str = DEFAULT_KRPC_ADDRESS, ut: float | None = None, lead_t
     """
     if ut is None:
         raise ValueError("ut is required")
-    conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    paused_before = best_effort_paused_state(conn)
-    if paused_before is True:
-        try:
-            best_effort_unpause(conn)
-        except Exception:
-            pass
-    try:
-        sc = conn.space_center
-        tgt = ut - max(0.0, lead_time_s)
-        try:
-            fn = getattr(sc, "warp_to", None)
-            if callable(fn):
-                fn(tgt)
-                return f"Warping to UT {tgt:.2f}"
-        except Exception:
-            pass
-        try:
-            tw = getattr(sc, "warp", None)
-            if tw is not None and hasattr(tw, "warp_to"):
-                tw.warp_to(tgt)
-                return f"Warping to UT {tgt:.2f}"
-        except Exception:
-            pass
-        return "warp_to not supported by this kRPC client/server."
-    except Exception as exc:
-        return f"Failed to warp: {exc}"
-    finally:
-        if paused_before is True:
-            try:
-                best_effort_pause(conn)
-            except Exception:
-                pass
-        try:
-            conn.close()
-        except Exception:
-            pass
+
+    # IMPORTANT: Some kRPC servers block the warp_to RPC call until the warp completes, which can
+    # exceed Codex CLI's 60s tool-call limit and return a timeout error while KSP keeps warping.
+    # To make behavior deterministic, we start a background warp job and return immediately.
+    tgt = float(ut) - max(0.0, float(lead_time_s))
+    job_id = job_tools._start_warp_job_impl(
+        params={
+            "ut": float(ut),
+            "lead_time_s": float(lead_time_s),
+            "address": address,
+            "rpc_port": rpc_port,
+            "stream_port": stream_port,
+            "name": name,
+            "timeout": timeout,
+            "mode": "rails",
+            "target_real_time_s": 10.0,
+            "settle_at_s": 2.0,
+            "max_wall_time_s": None,
+        }
+    )
+    return (
+        f"Started warp job {job_id} targeting UT {tgt:.2f}. "
+        f"Poll get_job_status('{job_id}_warp') for warp telemetry/ETA or get_job_status('{job_id}') for logs; "
+        f"cancel_job('{job_id}') resets warp to realtime."
+    )

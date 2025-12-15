@@ -13,7 +13,7 @@ Key Fields:
 - meta.current_stage — current stage index
 - stages[] — per-engine-stage Δv/TWR (approximate)
 - parts[].stage / parts[].decouple_stage — staging order and drop points
-- engines[] — engine locations (part_id), thrust/Isp
+- engines[] — engine locations (part_id), thrust + Isp (isp_sea_level_s, isp_vacuum_s)
 
 Checklist Before Staging/Burn:
 1) Confirm next stage has engines and sufficient propellant (parts with LiquidFuel/Oxidizer/MonoPropellant/SolidFuel).

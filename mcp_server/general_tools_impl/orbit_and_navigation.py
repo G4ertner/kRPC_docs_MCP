@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -21,7 +20,7 @@ def get_orbit_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.orbit_info(conn))
+        return json_dumps(readers.orbit_info(conn))
     finally:
         try:
             conn.close()
@@ -43,7 +42,7 @@ def get_navigation_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
       relative_inclination_deg?, phase_angle_deg? }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.navigation_info(conn))
+    return json_dumps(readers.navigation_info(conn))
 
 
 def get_targeting_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
@@ -55,4 +54,4 @@ def get_targeting_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 5000
       distance_m?, relative_speed_m_s? }.
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
-    return json.dumps(readers.targeting_info(conn))
+    return json_dumps(readers.targeting_info(conn))

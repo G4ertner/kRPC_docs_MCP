@@ -95,6 +95,69 @@ def test_get_job_status_echoes_requested_id_with_suffix():
     assert payload["job_id_suffix"] == "_atm"
 
 
+def test_get_job_status_includes_wall_time_elapsed_for_running_job():
+    stop_event = threading.Event()
+
+    def job(_handle):
+        while not stop_event.is_set():
+            time.sleep(0.02)
+
+    job_id = job_registry.create_job(job)
+
+    # Wait until it is RUNNING so started_at is set.
+    deadline = time.time() + 2.0
+    payload = None
+    while time.time() < deadline:
+        payload = json.loads(get_job_status(job_id))
+        if payload["status"] == "RUNNING":
+            break
+        time.sleep(0.02)
+
+    assert payload is not None
+    assert payload["status"] == "RUNNING"
+    assert "wall_time_elapsed_s" in payload
+    assert payload["wall_time_elapsed_s"] >= 0.0
+
+    stop_event.set()
+    job_registry.wait_for(job_id, timeout=5.0)
+
+
+def test_get_job_status_warp_suffix_adds_warp_progress(monkeypatch):
+    import mcp_server.libraries as libs
+
+    stop_event = threading.Event()
+
+    def job(_handle):
+        while not stop_event.is_set():
+            time.sleep(0.02)
+
+    job_id = job_registry.create_job(
+        job,
+        metadata={
+            "kind": "warp",
+            "params": {
+                "ut": 123.0,
+                "lead_time_s": 3.0,
+                "address": "127.0.0.1",
+                "rpc_port": 50000,
+                "stream_port": 50001,
+                "timeout": 0.01,
+            },
+        },
+    )
+
+    sentinel = {"universal_time_s": 1.0, "warp_rate_effective": 50.0}
+    monkeypatch.setattr(libs, "_warp_monitor", lambda **kwargs: sentinel)
+
+    payload = json.loads(get_job_status(f"{job_id}_warp"))
+    assert payload["canonical_job_id"] == job_id
+    assert payload["job_id_suffix"] == "_warp"
+    assert payload["warp_progress"] == sentinel
+
+    stop_event.set()
+    job_registry.wait_for(job_id, timeout=5.0)
+
+
 def test_cancel_job_accepts_suffixed_id():
     stop_event = threading.Event()
     callback_ready = threading.Event()
@@ -115,3 +178,56 @@ def test_cancel_job_accepts_suffixed_id():
     state = job_registry.get_state(job_id)
     assert state is not None
     assert state.status is JobStatus.CANCELLED
+
+
+def test_benign_shutdown_traceback_is_suppressed():
+    job_id = job_registry.create_job(lambda handle: None)
+    job_registry.wait_for(job_id)
+
+    # Simulate a common benign asyncio/proactor shutdown traceback on Windows.
+    job_registry.append_log(job_id, "Traceback (most recent call last):", stream="stderr")
+    job_registry.append_log(job_id, '  File "asyncio\\\\proactor_events.py", line 123, in _call_connection_lost', stream="stderr")
+    job_registry.append_log(
+        job_id,
+        "OSError: [WinError 10038] An operation was attempted on something that is not a socket",
+        stream="stderr",
+    )
+
+    payload = json.loads(get_job_status(job_id))
+    assert payload["status"] == "SUCCEEDED"
+    assert payload["traceback_suppressed"] is True
+    assert all("Traceback (most recent call last):" not in line for line in payload["logs"])
+
+
+def test_get_job_status_strips_ansi_sequences_by_default():
+    job_id = job_registry.create_job(lambda handle: None)
+    job_registry.wait_for(job_id)
+
+    msg = (
+        "\x1b[34mINFO\x1b[0m Terminating session: "
+        "\x1b]8;id=1;file://C:\\tmp\\server.py\x1b\\"
+        "server.py"
+        "\x1b]8;;\x1b\\"
+        " done"
+    )
+    job_registry.append_log(job_id, msg, stream="stderr")
+
+    payload = json.loads(get_job_status(job_id))
+    assert payload["logs_sanitized"] is True
+    combined = "\n".join(payload["logs"])
+    assert "\x1b" not in combined
+    assert "INFO" in combined
+    assert "server.py" in combined
+
+
+def test_get_job_status_raw_suffix_preserves_ansi_sequences():
+    job_id = job_registry.create_job(lambda handle: None)
+    job_registry.wait_for(job_id)
+
+    msg = "\x1b[31mERROR\x1b[0m boom"
+    job_registry.append_log(job_id, msg, stream="stderr")
+
+    payload = json.loads(get_job_status(f"{job_id}_raw"))
+    assert payload["logs_sanitized"] is False
+    combined = "\n".join(payload["logs"])
+    assert "\x1b" in combined

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
+import time
 
 from ..utils.krpc_utils import readers
+from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import open_connection
 from ..utils.krpc_helpers import DEFAULT_KRPC_ADDRESS
 
@@ -29,7 +30,7 @@ def get_status_overview(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 500
             "aero": readers.aero_status(conn),
             "maneuver_nodes": readers.maneuver_nodes_basic(conn),
         }
-        return json.dumps(out)
+        return json_dumps(out)
     finally:
         try:
             conn.close()
@@ -134,6 +135,89 @@ def _orbital_ascent_monitor(
             pass
 
 
+def _warp_monitor(
+    address: str = DEFAULT_KRPC_ADDRESS,
+    rpc_port: int = 50000,
+    stream_port: int = 50001,
+    name: str | None = None,
+    timeout: float = 2.0,
+    *,
+    target_ut: float | None = None,
+) -> dict:
+    """Internal helper: compact timewarp monitoring snapshot for logs/status polling.
+
+    Best-effort readback of:
+      - current UT
+      - warp mode/rate (Warp object when available)
+      - legacy warp_rate and factors (when exposed)
+      - optional ETA to a target UT
+
+    This function is intended for internal use by get_job_status suffix payloads
+    and is not exposed as an MCP tool.
+    """
+    conn = open_connection(address, rpc_port, stream_port, name, timeout)
+    try:
+        sc = conn.space_center
+        out: dict = {"universal_time_s": getattr(sc, "ut", None)}
+
+        # Warp object (newer kRPC)
+        tw = getattr(sc, "warp", None)
+        if tw is not None:
+            try:
+                out["timewarp_rate"] = getattr(tw, "rate", None)
+            except Exception:
+                pass
+            try:
+                mode = getattr(tw, "mode", None)
+                out["timewarp_mode"] = getattr(mode, "name", None) or str(mode)
+            except Exception:
+                pass
+
+        # Legacy properties (older kRPC)
+        for attr in ("warp_rate", "rails_warp_factor", "physics_warp_factor"):
+            try:
+                if hasattr(sc, attr):
+                    out[attr] = getattr(sc, attr)
+            except Exception:
+                pass
+
+        # Compute ETA (real seconds) from remaining game seconds and current warp multiplier.
+        if target_ut is not None:
+            try:
+                now_ut = float(out.get("universal_time_s") or getattr(sc, "ut", 0.0))
+            except Exception:
+                now_ut = None
+            if now_ut is not None:
+                remaining_game_s = float(target_ut) - now_ut
+                out["target_ut"] = float(target_ut)
+                out["remaining_game_time_s"] = remaining_game_s
+
+                # Prefer Warp.rate when available; fall back to legacy warp_rate.
+                rate = None
+                try:
+                    rate = float(out.get("timewarp_rate")) if out.get("timewarp_rate") is not None else None
+                    out["warp_rate_source"] = "warp.rate"
+                except Exception:
+                    rate = None
+                if rate is None:
+                    try:
+                        rate = float(out.get("warp_rate")) if out.get("warp_rate") is not None else None
+                        out["warp_rate_source"] = "space_center.warp_rate"
+                    except Exception:
+                        rate = None
+                if rate is None or rate <= 0:
+                    rate = 1.0
+                    out["warp_rate_source"] = "default(1.0)"
+                out["warp_rate_effective"] = rate
+                out["estimated_remaining_real_s"] = max(0.0, remaining_game_s) / rate if remaining_game_s > 0 else 0.0
+        return out
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def get_vessel_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Basic vessel info for the active craft.
@@ -153,7 +237,7 @@ def get_vessel_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, 
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.vessel_info(conn))
+        return json_dumps(readers.vessel_info(conn))
     finally:
         try:
             conn.close()
@@ -173,7 +257,7 @@ def get_time_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, 
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
-        return json.dumps(readers.time_status(conn))
+        return json_dumps(readers.time_status(conn))
     finally:
         try:
             conn.close()
@@ -229,7 +313,121 @@ def set_timewarp_rate(address: str = DEFAULT_KRPC_ADDRESS, rate: float = 1.0, mo
             except Exception as exc:
                 return f"Failed to set warp rate to {rate}: {exc}"
 
-            return f"Timewarp rate set to {float(tw.rate)}."
+            try:
+                actual_rate = float(getattr(tw, "rate", float(rate)))
+            except Exception:
+                actual_rate = float(rate)
+            requested_mode = mode.lower().strip() if isinstance(mode, str) else None
+            try:
+                actual_mode = getattr(getattr(tw, "mode", None), "name", None) or str(getattr(tw, "mode", ""))
+            except Exception:
+                actual_mode = ""
+            actual_mode = actual_mode.lower().strip() if actual_mode else None
+            if requested_mode:
+                return f"Timewarp set (warp object). Requested mode={requested_mode}, rate={float(rate):g}. Actual mode={actual_mode}, rate={actual_rate:g}."
+            return f"Timewarp set (warp object). Requested rate={float(rate):g}. Actual mode={actual_mode}, rate={actual_rate:g}."
+
+        def _safe_float(x) -> float | None:
+            try:
+                if x is None:
+                    return None
+                return float(x)
+            except Exception:
+                return None
+
+        def _safe_int(x) -> int | None:
+            try:
+                if x is None:
+                    return None
+                return int(x)
+            except Exception:
+                return None
+
+        def _read_legacy_warp_state() -> dict:
+            state: dict = {}
+            state["warp_rate"] = _safe_float(getattr(sc, "warp_rate", None))
+            if hasattr(sc, "rails_warp_factor"):
+                state["rails_warp_factor"] = _safe_int(getattr(sc, "rails_warp_factor", None))
+            if hasattr(sc, "physics_warp_factor"):
+                state["physics_warp_factor"] = _safe_int(getattr(sc, "physics_warp_factor", None))
+            return state
+
+        def _wait_for_legacy_state(
+            *,
+            wait_s: float = 0.35,
+            poll_s: float = 0.02,
+            factor_attr: str | None = None,
+            desired_factor: int | None = None,
+            expected_rate: float | None = None,
+        ) -> tuple[dict, bool]:
+            """
+            kRPC/KSP timewarp changes are not always reflected immediately after writing
+            warp_factor. Poll briefly to avoid returning internally contradictory
+            factor/rate readouts.
+            """
+            deadline = time.monotonic() + max(0.0, float(wait_s))
+            prev = None
+            stable_count = 0
+            last = _read_legacy_warp_state()
+            while time.monotonic() < deadline:
+                time.sleep(max(0.0, float(poll_s)))
+                cur = _read_legacy_warp_state()
+                rate_now = cur.get("warp_rate")
+                factor_ok = True
+                if factor_attr is not None and desired_factor is not None:
+                    factor_ok = cur.get(factor_attr) == desired_factor
+                rate_ok = True
+                if expected_rate is not None and rate_now is not None:
+                    try:
+                        rate_ok = abs(float(rate_now) - float(expected_rate)) <= max(1e-6, 1e-3 * float(expected_rate))
+                    except Exception:
+                        rate_ok = False
+
+                if cur == prev and rate_now is not None and factor_ok and rate_ok:
+                    stable_count += 1
+                    if stable_count >= 1:
+                        return cur, True
+                else:
+                    stable_count = 0
+                prev = cur
+                last = cur
+            return last, False
+
+        def _get_rate_table(*, rails: bool, max_factor: int) -> list[float]:
+            """
+            Prefer rate tables from the kRPC client when available; otherwise fall back
+            to stock-like defaults.
+            """
+            attr = "rails_warp_factors" if rails else "physics_warp_factors"
+            rates = None
+            if hasattr(sc, attr):
+                try:
+                    raw = list(getattr(sc, attr))
+                    parsed = []
+                    for x in raw:
+                        xf = _safe_float(x)
+                        if xf is not None and xf > 0:
+                            parsed.append(xf)
+                    if parsed:
+                        rates = parsed
+                except Exception:
+                    rates = None
+            if rates is None:
+                rates = [1.0, 5.0, 10.0, 50.0, 100.0, 1000.0, 10000.0, 100000.0] if rails else [1.0, 2.0, 3.0, 4.0]
+            return rates[: max_factor + 1] if max_factor is not None else rates
+
+        def _choose_factor(*, target_rate: float, rates: list[float]) -> int:
+            if not rates:
+                return 0
+            # Choose the highest factor whose rate does not exceed target_rate.
+            chosen = 0
+            for i, r in enumerate(rates):
+                try:
+                    if float(r) <= float(target_rate) + 1e-9:
+                        chosen = i
+                except Exception:
+                    continue
+            return chosen
 
         def _set_factor(
             *,
@@ -253,31 +451,37 @@ def set_timewarp_rate(address: str = DEFAULT_KRPC_ADDRESS, rate: float = 1.0, mo
                 # Best-effort default rails max when client does not report it
                 max_factor = 7
 
-            best_factor = None
-            best_rate = None
-            for f in range(max_factor, -1, -1):
-                try:
-                    setattr(sc, factor_attr, f)
-                except Exception:
-                    continue
-                try:
-                    current_rate = float(getattr(sc, "warp_rate"))
-                except Exception:
-                    current_rate = None
-                if current_rate is None:
-                    continue
-                best_factor = f
-                best_rate = current_rate
-                if current_rate <= target_rate:
-                    break
+            rates = _get_rate_table(rails=rails, max_factor=max_factor)
+            desired_factor = _choose_factor(target_rate=float(target_rate), rates=rates)
+            expected_rate = _safe_float(rates[desired_factor]) if 0 <= desired_factor < len(rates) else None
 
-            if best_factor is None:
-                return False, f"Failed to set {'rails' if rails else 'physics'} warp."
+            try:
+                setattr(sc, factor_attr, int(desired_factor))
+            except Exception as exc:
+                return False, f"Failed to set {'rails' if rails else 'physics'} warp factor to {desired_factor}: {exc}"
 
-            return True, (
-                f"{'Rails' if rails else 'Physics'} warp factor set to {best_factor} "
-                f"(rate {best_rate:.3g}). Requested {target_rate}."
+            state, stable = _wait_for_legacy_state(
+                factor_attr=factor_attr,
+                desired_factor=int(desired_factor),
+                expected_rate=expected_rate,
             )
+            observed_rate = state.get("warp_rate")
+            observed_factor = state.get(factor_attr)
+            if observed_factor is None:
+                observed_factor = desired_factor
+
+            bits = [
+                f"{'Rails' if rails else 'Physics'} timewarp set.",
+                f"Requested rate={float(target_rate):g}.",
+                f"Applied factor={int(desired_factor)}" + (f" (expected rate={expected_rate:g})." if expected_rate is not None else "."),
+            ]
+            if observed_rate is not None:
+                bits.append(f"Observed factor={int(observed_factor)}, warp_rate={observed_rate:g}.")
+            else:
+                bits.append(f"Observed factor={int(observed_factor)} (warp_rate unavailable).")
+            if not stable:
+                bits.append("Warp state may still be updating; re-check with get_time_status.")
+            return True, " ".join(bits)
 
         via_warp = _set_via_warp_object()
         if via_warp:
