@@ -15,7 +15,9 @@ env/
 # Caches / scratch
 *.sqlite
 krpc_docs_cache*
-artifacts/
+artifacts/blueprints
+artifacts/jobs
+artifacts/screenshots
 
 # Data outputs (include main dataset + manifest; keep backups ignored)
 data/krpc_python_docs.full.jsonl

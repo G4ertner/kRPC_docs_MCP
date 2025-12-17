@@ -1,0 +1,15 @@
+{
+  "stages": [
+    {
+      "stage": 0,
+      "engines": 1,
+      "max_thrust_n": 124926.7734375,
+      "combined_isp_s": 354.79205322265625,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 14050.0,
+      "m1_kg": 14050.0,
+      "delta_v_m_s": null,
+      "twr_surface": 0.9060702269008251
+    }
+  ]
+}

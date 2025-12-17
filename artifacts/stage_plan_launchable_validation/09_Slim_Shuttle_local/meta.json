@@ -1,0 +1,14 @@
+{
+  "craft_directory": "VAB",
+  "craft_name": "Slim Shuttle_local",
+  "launch_site": "LaunchPad",
+  "expected_vessel_name": "Slim Shuttle_local",
+  "vessel_info": {
+    "name": "Slim Shuttle_local",
+    "mass_kg": 74791.0,
+    "throttle": 0.0,
+    "situation": "pre_launch"
+  },
+  "timestamp_utc": "2025-12-15T20:53:54Z",
+  "environment": "current"
+}

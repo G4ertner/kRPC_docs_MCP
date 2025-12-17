@@ -1,0 +1,59 @@
+{
+  "stages": [
+    {
+      "stage": 4,
+      "engines": 1,
+      "max_thrust_n": 60000.0,
+      "combined_isp_s": 345.0,
+      "prop_mass_kg": 460.36170959472656,
+      "m0_kg": 4832.86181640625,
+      "m1_kg": 4372.500106811523,
+      "delta_v_m_s": 338.68077481187066,
+      "twr_surface": 1.265113626257209
+    },
+    {
+      "stage": 3,
+      "engines": 1,
+      "max_thrust_n": 60000.0,
+      "combined_isp_s": 345.0,
+      "prop_mass_kg": 1500.0,
+      "m0_kg": 4372.500106811523,
+      "m1_kg": 2872.5001068115234,
+      "delta_v_m_s": 1421.4984696518102,
+      "twr_surface": 1.3983119927725278
+    },
+    {
+      "stage": 2,
+      "engines": 1,
+      "max_thrust_n": 60000.0,
+      "combined_isp_s": 345.0,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 2082.5001068115234,
+      "m1_kg": 2082.5001068115234,
+      "delta_v_m_s": null,
+      "twr_surface": 2.9359515122018043
+    },
+    {
+      "stage": 1,
+      "engines": 0,
+      "max_thrust_n": 0.0,
+      "combined_isp_s": null,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 1145.0001220703125,
+      "m1_kg": 1145.0001220703125,
+      "delta_v_m_s": null,
+      "twr_surface": null
+    },
+    {
+      "stage": 0,
+      "engines": 0,
+      "max_thrust_n": 0.0,
+      "combined_isp_s": null,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 1045.0001220703125,
+      "m1_kg": 1045.0001220703125,
+      "delta_v_m_s": null,
+      "twr_surface": null
+    }
+  ]
+}

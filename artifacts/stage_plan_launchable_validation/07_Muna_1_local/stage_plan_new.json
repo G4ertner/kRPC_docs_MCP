@@ -1,0 +1,81 @@
+{
+  "stages": [
+    {
+      "stage": 6,
+      "engines": 0,
+      "max_thrust_n": 0.0,
+      "combined_isp_s": null,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 76366.5859375,
+      "m1_kg": 76366.5859375,
+      "delta_v_m_s": null,
+      "twr_surface": null
+    },
+    {
+      "stage": 5,
+      "engines": 25,
+      "max_thrust_n": 1815137.775390625,
+      "combined_isp_s": 283.72851461953076,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 76366.5859375,
+      "m1_kg": 76366.5859375,
+      "delta_v_m_s": null,
+      "twr_surface": 2.422082214134395
+    },
+    {
+      "stage": 4,
+      "engines": 25,
+      "max_thrust_n": 1815137.775390625,
+      "combined_isp_s": 283.72851461953076,
+      "prop_mass_kg": 32800.0,
+      "m0_kg": 76366.5859375,
+      "m1_kg": 43566.5859375,
+      "delta_v_m_s": 1561.6499834657452,
+      "twr_surface": 2.422082214134395
+    },
+    {
+      "stage": 3,
+      "engines": 5,
+      "max_thrust_n": 363027.4453125,
+      "combined_isp_s": 283.72851478419335,
+      "prop_mass_kg": 15700.0,
+      "m0_kg": 29746.582885742188,
+      "m1_kg": 14046.582885742188,
+      "delta_v_m_s": 2087.752096237976,
+      "twr_surface": 1.2436123795272163
+    },
+    {
+      "stage": 2,
+      "engines": 5,
+      "max_thrust_n": 363075.28125,
+      "combined_isp_s": 283.72844886802756,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 9624.082733154297,
+      "m1_kg": 9624.082733154297,
+      "delta_v_m_s": null,
+      "twr_surface": 3.844324111539553
+    },
+    {
+      "stage": 1,
+      "engines": 5,
+      "max_thrust_n": 363075.28125,
+      "combined_isp_s": 283.72844886802756,
+      "prop_mass_kg": 4500.0,
+      "m0_kg": 9624.082733154297,
+      "m1_kg": 5124.082733154297,
+      "delta_v_m_s": 1753.8102779698263,
+      "twr_surface": 3.844324111539553
+    },
+    {
+      "stage": 0,
+      "engines": 5,
+      "max_thrust_n": 363075.28125,
+      "combined_isp_s": 283.72844886802756,
+      "prop_mass_kg": 0.0,
+      "m0_kg": 1279.9987487792969,
+      "m1_kg": 1279.9987487792969,
+      "delta_v_m_s": null,
+      "twr_surface": 28.904788647489468
+    }
+  ]
+}

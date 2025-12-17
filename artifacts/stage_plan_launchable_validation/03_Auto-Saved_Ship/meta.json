@@ -1,0 +1,14 @@
+{
+  "craft_directory": "VAB",
+  "craft_name": "Auto-Saved Ship",
+  "launch_site": "LaunchPad",
+  "expected_vessel_name": "Dynawing_local",
+  "vessel_info": {
+    "name": "Dynawing_local",
+    "mass_kg": 234748.0,
+    "throttle": 0.0,
+    "situation": "pre_launch"
+  },
+  "timestamp_utc": "2025-12-15T20:51:43Z",
+  "environment": "current"
+}

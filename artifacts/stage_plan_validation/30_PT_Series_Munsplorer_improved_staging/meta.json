@@ -1,0 +1,9 @@
+{
+  "name": "PT Series Munsplorer improved staging",
+  "type": "VesselType.ship",
+  "situation": "VesselSituation.pre_launch",
+  "body": "Kerbin",
+  "current_stage": 7,
+  "timestamp_utc": "2025-12-15T18:30:35Z",
+  "environment": "current"
+}

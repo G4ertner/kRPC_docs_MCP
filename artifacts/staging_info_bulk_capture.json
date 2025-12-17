@@ -1,0 +1,804 @@
+{
+  "captured_at_unix": 1765818954.015862,
+  "address": "127.0.0.1",
+  "rpc_port": 50000,
+  "stream_port": 50001,
+  "screenshot_scale": 4,
+  "vessels_total_in_game": 30,
+  "vessels_selected": 7,
+  "items": [
+    {
+      "index": 1,
+      "label": "PT Series Munsplorer improved staging [pre_launch @ Kerbin]",
+      "name": "PT Series Munsplorer improved staging",
+      "type": "ship",
+      "situation": "pre_launch",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\01_PT_Series_Munsplorer_improved_staging_pre_launch_Kerbin_.png",
+      "legacy": {
+        "current_stage": 7,
+        "stages": [
+          {
+            "stage": 7,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 37622.5,
+            "m1_kg": 37622.5
+          },
+          {
+            "stage": 6,
+            "engines": 3,
+            "max_thrust_n": 579492.703125,
+            "combined_isp_s": 261.0408581318678,
+            "delta_v_m_s": null,
+            "twr_surface": 1.569578285274208,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 37622.5,
+            "m1_kg": 37622.5
+          },
+          {
+            "stage": 5,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 16000.0,
+            "m0_kg": 37622.5,
+            "m1_kg": 21622.5
+          },
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 15112.7822265625,
+            "combined_isp_s": 86.80783081054688,
+            "delta_v_m_s": 545.3374360275859,
+            "twr_surface": 0.09105824689690697,
+            "prop_mass_kg": 8000.0,
+            "m0_kg": 16912.49963760376,
+            "m1_kg": 8912.49963760376
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 15123.943359375,
+            "combined_isp_s": 86.80783081054688,
+            "delta_v_m_s": 320.6458114444211,
+            "twr_surface": 0.2418454290971073,
+            "prop_mass_kg": 2000.0,
+            "m0_kg": 6372.49963760376,
+            "m1_kg": 4372.49963760376
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 1500.0,
+            "m0_kg": 3582.4996376037598,
+            "m1_kg": 2082.4996376037598
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1144.9996528625488,
+            "m1_kg": 1144.9996528625488
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9996528625488,
+            "m1_kg": 1044.9996528625488
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 7,
+        "stages": [
+          {
+            "stage": 7,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 37622.5,
+            "m1_kg": 37622.5
+          },
+          {
+            "stage": 6,
+            "engines": 3,
+            "max_thrust_n": 579492.703125,
+            "combined_isp_s": 261.0408581318678,
+            "delta_v_m_s": 1417.866397398976,
+            "twr_surface": 1.569578285274208,
+            "prop_mass_kg": 16000.0,
+            "m0_kg": 37622.5,
+            "m1_kg": 21622.5
+          },
+          {
+            "stage": 5,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 16912.49963760376,
+            "m1_kg": 16912.49963760376
+          },
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 15112.7822265625,
+            "combined_isp_s": 86.80783081054688,
+            "delta_v_m_s": 127.55823110651528,
+            "twr_surface": 0.10715064230132287,
+            "prop_mass_kg": 2000.0,
+            "m0_kg": 14372.49963760376,
+            "m1_kg": 12372.49963760376
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 15123.943359375,
+            "combined_isp_s": 86.80783081054688,
+            "delta_v_m_s": 118.06945302183387,
+            "twr_surface": 0.13305935311872663,
+            "prop_mass_kg": 1500.0,
+            "m0_kg": 11582.49963760376,
+            "m1_kg": 10082.49963760376
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 9144.999652862549,
+            "m1_kg": 9144.999652862549
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 9044.999652862549,
+            "m1_kg": 9044.999652862549
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 9044.999652862549,
+            "m1_kg": 9044.999652862549
+          }
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "label": "#autoLOC_501214 [orbiting @ Kerbin]",
+      "name": "#autoLOC_501214",
+      "type": "ship",
+      "situation": "orbiting",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\02__autoLOC_501214_orbiting_Kerbin_.png",
+      "legacy": {
+        "current_stage": 2,
+        "stages": [
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": null,
+            "twr_surface": 1.7132810065760178,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 3568.6611328125,
+            "m1_kg": 3568.6611328125
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 1733.6610412597656,
+            "m0_kg": 3568.6611328125,
+            "m1_kg": 1835.0000915527344
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999694824219,
+            "m1_kg": 1044.9999694824219
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 2,
+        "stages": [
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 2250.3845060215363,
+            "twr_surface": 1.7132810065760178,
+            "prop_mass_kg": 1733.6610412597656,
+            "m0_kg": 3568.6611328125,
+            "m1_kg": 1835.0000915527344
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999694824219,
+            "m1_kg": 1044.9999694824219
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999694824219,
+            "m1_kg": 1044.9999694824219
+          }
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "label": "#autoLOC_501214 [orbiting @ Kerbin]",
+      "name": "#autoLOC_501214",
+      "type": "ship",
+      "situation": "orbiting",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\03__autoLOC_501214_orbiting_Kerbin_.png",
+      "legacy": {
+        "current_stage": 2,
+        "stages": [
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": null,
+            "twr_surface": 1.8013768579143836,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 3394.13671875,
+            "m1_kg": 3394.13671875
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 1559.1368103027344,
+            "m0_kg": 3394.13671875,
+            "m1_kg": 1834.9999084472656
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999084472656,
+            "m1_kg": 1044.9999084472656
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 2,
+        "stages": [
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 2080.7429372990414,
+            "twr_surface": 1.8013768579143836,
+            "prop_mass_kg": 1559.1368103027344,
+            "m0_kg": 3394.13671875,
+            "m1_kg": 1834.9999084472656
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999084472656,
+            "m1_kg": 1044.9999084472656
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9999084472656,
+            "m1_kg": 1044.9999084472656
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "label": "#autoLOC_8006417 [orbiting @ Kerbin]",
+      "name": "#autoLOC_8006417",
+      "type": "ship",
+      "situation": "orbiting",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\04__autoLOC_8006417_orbiting_Kerbin_.png",
+      "legacy": {
+        "current_stage": 1,
+        "stages": [
+          {
+            "stage": 1,
+            "engines": 1,
+            "max_thrust_n": 249999.984375,
+            "combined_isp_s": 350.0,
+            "delta_v_m_s": null,
+            "twr_surface": 1.6749419427369057,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15209.7783203125,
+            "m1_kg": 15209.7783203125
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 4589.77783203125,
+            "m0_kg": 15209.7783203125,
+            "m1_kg": 10620.00048828125
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 1,
+        "stages": [
+          {
+            "stage": 1,
+            "engines": 1,
+            "max_thrust_n": 249999.984375,
+            "combined_isp_s": 350.0,
+            "delta_v_m_s": 1232.8902180847701,
+            "twr_surface": 1.6749419427369057,
+            "prop_mass_kg": 4589.77783203125,
+            "m0_kg": 15209.7783203125,
+            "m1_kg": 10620.00048828125
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 7645.0006103515625,
+            "m1_kg": 7645.0006103515625
+          }
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "label": "Acapello Lander [sub_orbital @ Kerbin]",
+      "name": "Acapello Lander",
+      "type": "lander",
+      "situation": "sub_orbital",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\05_Acapello_Lander_sub_orbital_Kerbin_.png",
+      "legacy": {
+        "current_stage": 3,
+        "stages": [
+          {
+            "stage": 3,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 15829.9580078125
+          },
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 300000.0,
+            "combined_isp_s": 330.0,
+            "delta_v_m_s": null,
+            "twr_surface": 1.9311862150032975,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 15829.9580078125
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 15829.9580078125
+          },
+          {
+            "stage": 0,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": null,
+            "twr_surface": 0.3862372430006595,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 15829.9580078125
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 3,
+        "stages": [
+          {
+            "stage": 3,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 15829.9580078125
+          },
+          {
+            "stage": 2,
+            "engines": 1,
+            "max_thrust_n": 300000.0,
+            "combined_isp_s": 330.0,
+            "delta_v_m_s": 1800.3785557376987,
+            "twr_surface": 1.9311862150032975,
+            "prop_mass_kg": 6754.458669275045,
+            "m0_kg": 15829.9580078125,
+            "m1_kg": 9075.499338537455
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 9075.499338537455,
+            "m1_kg": 9075.499338537455
+          },
+          {
+            "stage": 0,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 701.7452843483043,
+            "twr_surface": 0.6736950893480007,
+            "prop_mass_kg": 1700.0,
+            "m0_kg": 9075.499338537455,
+            "m1_kg": 7375.499338537455
+          }
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "label": "PT Series Munsplorer improved staging [orbiting @ Kerbin]",
+      "name": "PT Series Munsplorer improved staging",
+      "type": "ship",
+      "situation": "orbiting",
+      "body": "Kerbin",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\06_PT_Series_Munsplorer_improved_staging_orbiting_Kerbin_.png",
+      "legacy": {
+        "current_stage": 4,
+        "stages": [
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": null,
+            "twr_surface": 1.265113626257209,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 4832.86181640625,
+            "m1_kg": 4832.86181640625
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 338.68077481187066,
+            "twr_surface": 1.265113626257209,
+            "prop_mass_kg": 460.36170959472656,
+            "m0_kg": 4832.86181640625,
+            "m1_kg": 4372.500106811523
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 1500.0,
+            "m0_kg": 3582.5001068115234,
+            "m1_kg": 2082.5001068115234
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1145.0001220703125,
+            "m1_kg": 1145.0001220703125
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1045.0001220703125,
+            "m1_kg": 1045.0001220703125
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 4,
+        "stages": [
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 338.68077481187066,
+            "twr_surface": 1.265113626257209,
+            "prop_mass_kg": 460.36170959472656,
+            "m0_kg": 4832.86181640625,
+            "m1_kg": 4372.500106811523
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 1835.4092664431316,
+            "twr_surface": 1.7066627091311841,
+            "prop_mass_kg": 1500.0,
+            "m0_kg": 3582.5001068115234,
+            "m1_kg": 2082.5001068115234
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1145.0001220703125,
+            "m1_kg": 1145.0001220703125
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1045.0001220703125,
+            "m1_kg": 1045.0001220703125
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1045.0001220703125,
+            "m1_kg": 1045.0001220703125
+          }
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "label": "PT Series Munsplorer improved staging [escaping @ Mun]",
+      "name": "PT Series Munsplorer improved staging",
+      "type": "ship",
+      "situation": "escaping",
+      "body": "Mun",
+      "screenshot_path": "E:\\Coding_projects\\Python projects\\GeePT\\GeePT_MCP\\artifacts\\screenshots\\staging_info_bulk\\07_PT_Series_Munsplorer_improved_staging_escaping_Mun_.png",
+      "legacy": {
+        "current_stage": 4,
+        "stages": [
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": null,
+            "twr_surface": 7.720622853107854,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 4770.60546875,
+            "m1_kg": 4770.60546875
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 361.9323292219611,
+            "twr_surface": 7.720622853107854,
+            "prop_mass_kg": 483.99242401123047,
+            "m0_kg": 4770.60546875,
+            "m1_kg": 4286.6130447387695
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 1414.1133117675781,
+            "m0_kg": 3496.6130447387695,
+            "m1_kg": 2082.4997329711914
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1144.9997482299805,
+            "m1_kg": 1144.9997482299805
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9997482299805,
+            "m1_kg": 1044.9997482299805
+          }
+        ]
+      },
+      "current": {
+        "current_stage": 4,
+        "stages": [
+          {
+            "stage": 4,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 361.9323292219611,
+            "twr_surface": 7.720622853107854,
+            "prop_mass_kg": 483.99242401123047,
+            "m0_kg": 4770.60546875,
+            "m1_kg": 4286.6130447387695
+          },
+          {
+            "stage": 3,
+            "engines": 1,
+            "max_thrust_n": 60000.0,
+            "combined_isp_s": 345.0,
+            "delta_v_m_s": 1753.3104763655294,
+            "twr_surface": 10.533635015922748,
+            "prop_mass_kg": 1414.1133117675781,
+            "m0_kg": 3496.6130447387695,
+            "m1_kg": 2082.4997329711914
+          },
+          {
+            "stage": 2,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1144.9997482299805,
+            "m1_kg": 1144.9997482299805
+          },
+          {
+            "stage": 1,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9997482299805,
+            "m1_kg": 1044.9997482299805
+          },
+          {
+            "stage": 0,
+            "engines": 0,
+            "max_thrust_n": 0.0,
+            "combined_isp_s": null,
+            "delta_v_m_s": null,
+            "twr_surface": null,
+            "prop_mass_kg": 0.0,
+            "m0_kg": 1044.9997482299805,
+            "m1_kg": 1044.9997482299805
+          }
+        ]
+      }
+    }
+  ]
+}

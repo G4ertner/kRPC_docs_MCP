@@ -1,0 +1,9 @@
+{
+  "name": "Acapello Debris",
+  "type": "VesselType.debris",
+  "situation": "VesselSituation.flying",
+  "body": "Kerbin",
+  "current_stage": 0,
+  "timestamp_utc": "2025-12-15T18:29:42Z",
+  "environment": "current"
+}

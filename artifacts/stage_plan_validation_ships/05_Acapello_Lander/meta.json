@@ -1,0 +1,9 @@
+{
+  "name": "Acapello Lander",
+  "type": "VesselType.lander",
+  "situation": "VesselSituation.sub_orbital",
+  "body": "Kerbin",
+  "current_stage": 3,
+  "timestamp_utc": "2025-12-15T18:40:05Z",
+  "environment": "current"
+}

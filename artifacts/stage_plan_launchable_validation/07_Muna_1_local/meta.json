@@ -1,0 +1,14 @@
+{
+  "craft_directory": "VAB",
+  "craft_name": "Muna 1_local",
+  "launch_site": "LaunchPad",
+  "expected_vessel_name": "Muna 1_local",
+  "vessel_info": {
+    "name": "Muna 1_local",
+    "mass_kg": 76366.5859375,
+    "throttle": 0.0,
+    "situation": "pre_launch"
+  },
+  "timestamp_utc": "2025-12-15T20:53:10Z",
+  "environment": "current"
+}
