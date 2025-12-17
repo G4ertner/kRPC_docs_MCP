@@ -69,7 +69,10 @@ def set_target_vessel(address: str = DEFAULT_KRPC_ADDRESS, vessel_name: str | No
         cb = v.orbit.body
         ref = getattr(cb, 'non_rotating_reference_frame', cb.reference_frame)
         vp = v.position(ref)
-        target = sorted(candidates, key=lambda ov: sum((ov.position(ref)[i]-vp[i])**2 for i in range(3)) if ov.id != v.id else 0)[0]
+        target = sorted(
+            candidates,
+            key=lambda ov: sum((ov.position(ref)[i] - vp[i]) ** 2 for i in range(3)) if ov != v else 0,
+        )[0]
         # Set both vessel- and spacecenter-level targets when available
         try:
             v.target_vessel = target

@@ -107,6 +107,7 @@ Need your LLM to inspect your craft? The blueprint tools expose:
 - `get_blueprint_ascii`: produces a LLM-readable per‑stage summary of the vessel.
 - `get_stage_plan`: provides a stock-like stage plan (thrust, Isp, Δv).
 - `get_staging_info`: returns per-stage Δv/TWR estimates.
+- `get_staging_info_legacy`: legacy version of `get_staging_info` for comparisons.
 - `export_blueprint_diagram`: generates a diagram (SVG or PNG) of your vessel’s staging and structure.  
 
 These tools let your LLM understand the craft’s structure, plan staging and fuel usage to generate vessel specific flight plans and mission profiles
@@ -202,6 +203,7 @@ On top of that, the MCP server comes with a whole set of hardcoded tools your LL
 - `get_part_tree` — Hierarchical part tree with resources.
 - `get_stage_plan` — Stock-like stage plan (thrust, Isp, Δv).
 - `get_staging_info` — Per-stage Δv/TWR estimates.
+- `get_staging_info_legacy` — Legacy version of `get_staging_info` for comparisons.
 - `export_blueprint_diagram` — Exports a 2D blueprint diagram (SVG/PNG).
 - `start_part_tree_job` / `start_stage_plan_job` - Kick off background jobs that produce the same JSON artifacts without hitting tool timeouts.
 - `get_job_status` - Polls job state/logs and exposes the `result_resource` URI once the artifact is ready.

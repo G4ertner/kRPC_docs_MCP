@@ -1025,7 +1025,11 @@ def list_vessels(conn) -> List[Dict[str, Any]]:
                     item["distance_m"] = sqrt(dp[0] ** 2 + dp[1] ** 2 + dp[2] ** 2)
                 except Exception:
                     pass
-            if ov.id == v.id:
+            try:
+                is_self = (ov == v)
+            except Exception:
+                is_self = False
+            if is_self:
                 item["self"] = True
                 item.setdefault("distance_m", 0.0)
             out.append(item)
@@ -1049,6 +1053,37 @@ RESOURCE_DENSITY_KG_PER_UNIT = {
     "Ore": 10.0,
     "ElectricCharge": 0.0,
 }
+
+
+def _resource_density_kg_per_unit(conn, resource_name: str) -> float:
+    try:
+        sc = getattr(conn, "space_center", None)
+        resources = getattr(sc, "resources", None)
+        if resources is not None:
+            # kRPC: Resources.density(name) -> kg/l (resource amount units are liters).
+            density = resources.density(resource_name)
+            if density is not None:
+                return float(density)
+    except Exception:
+        pass
+    return float(RESOURCE_DENSITY_KG_PER_UNIT.get(resource_name, 0.0))
+
+
+def _resources_mass_kg(conn, resources, *, names_filter: set[str] | None = None) -> float:
+    mass = 0.0
+    try:
+        names = list(getattr(resources, "names", []) or [])
+        for name in names:
+            if names_filter is not None and name not in names_filter:
+                continue
+            try:
+                amount = float(resources.amount(name))
+            except Exception:
+                continue
+            mass += amount * _resource_density_kg_per_unit(conn, name)
+    except Exception:
+        pass
+    return mass
 
 
 def _stage_prop_mass_kg(conn, stage: int) -> float:
@@ -1112,7 +1147,7 @@ def _combined_isp_and_thrust_for_stage(conn, stage: int):
     return combined_isp, total_thrust, count
 
 
-def staging_info(conn) -> Dict[str, Any]:
+def staging_info_legacy(conn) -> Dict[str, Any]:
     v = conn.space_center.active_vessel
     body = v.orbit.body
     current_stage = getattr(v.control, "current_stage", 0)
@@ -1149,6 +1184,113 @@ def staging_info(conn) -> Dict[str, Any]:
         # Update mass for next stage iteration: drop stage dry mass
         drop = _stage_dry_drop_mass_kg(conn, s)
         mass_current = max(0.1, m1 - drop)
+    return {"current_stage": current_stage, "stages": stages}
+
+
+def staging_info(conn) -> Dict[str, Any]:
+    v = conn.space_center.active_vessel
+    body = v.orbit.body
+    current_stage = getattr(v.control, "current_stage", 0)
+    stages = []
+
+    mass_before_event = float(getattr(v, "mass", 0.0) or 0.0)
+
+    def _propellant_names_for_engines(engines) -> set[str]:
+        names: set[str] = set()
+        for e in engines:
+            try:
+                for n in getattr(e, "propellant_names", []) or []:
+                    if n:
+                        names.add(str(n))
+            except Exception:
+                continue
+        return names
+
+    def _propellant_mass_kg_from_engine_availability(engines, propellant_names: set[str]) -> float:
+        if not engines or not propellant_names:
+            return 0.0
+        total = 0.0
+        for name in propellant_names:
+            available = None
+            for e in engines:
+                try:
+                    for p in getattr(e, "propellants", []) or []:
+                        if getattr(p, "name", None) != name:
+                            continue
+                        try:
+                            val = float(getattr(p, "total_resource_available", 0.0) or 0.0)
+                        except Exception:
+                            val = 0.0
+                        if available is None or val > available:
+                            available = val
+                        break
+                except Exception:
+                    continue
+            if available is None:
+                continue
+            total += available * _resource_density_kg_per_unit(conn, name)
+        return total
+
+    for s in range(current_stage, -1, -1):
+        # Stage event: drop anything decoupled at this stage before any new burn.
+        drop_mass = _stage_dry_drop_mass_kg(conn, s)
+        m0 = max(0.0, mass_before_event - drop_mass)
+
+        engines = []
+        try:
+            engines = [e for e in v.parts.engines if getattr(e.part, "stage", None) == s]
+        except Exception:
+            engines = []
+
+        prop_mass = 0.0
+        propellant_names: set[str] = set()
+        if engines:
+            propellant_names = _propellant_names_for_engines(engines)
+            # Approximation: fuel burned by stage s engines is typically in parts
+            # decoupled at stage s-1 (because they are dropped after the burn).
+            fuel_stage = s - 1
+            if fuel_stage >= 0:
+                try:
+                    res = v.resources_in_decouple_stage(fuel_stage, False)
+                    prop_mass = _resources_mass_kg(conn, res, names_filter=propellant_names or None)
+                except Exception:
+                    prop_mass = 0.0
+            # Fallback (e.g., final stage with decouple_stage=-1 tanks): use per-engine reachable resources.
+            if prop_mass <= 0.0:
+                prop_mass = _propellant_mass_kg_from_engine_availability(engines, propellant_names)
+
+        isp, thrust, eng_count = _combined_isp_and_thrust_for_stage(conn, s)
+
+        m1_raw = m0 - prop_mass
+        m1 = max(0.0, m1_raw)
+        dv = None
+        if isp and isp > 0 and m1 > 0 and m0 > m1:
+            from math import log
+            dv = G0 * isp * log(m0 / m1)
+
+        twr = None
+        try:
+            g = float(getattr(body, "surface_gravity", 9.81) or 9.81)
+            if thrust and g > 0 and m0 > 0:
+                twr = thrust / (m0 * g)
+        except Exception:
+            pass
+
+        stages.append({
+            "stage": s,
+            "engines": eng_count,
+            "max_thrust_n": thrust,
+            "combined_isp_s": isp,
+            "delta_v_m_s": dv,
+            "twr_surface": twr,
+            "prop_mass_kg": prop_mass,
+            "m0_kg": m0,
+            "m1_kg": m1,
+        })
+
+        # After the burn, this becomes the mass entering the next stage event.
+        mass_before_event = m1
+
     return {"current_stage": current_stage, "stages": stages}
 
 
@@ -1311,15 +1453,12 @@ def _engine_isp(e, env: str) -> float | None:
     return None
 
 
-def stage_plan_approx(conn, environment: str = "current") -> Dict[str, Any]:
+def stage_plan_approx_legacy(conn, environment: str = "current") -> Dict[str, Any]:
     """
-    Approximate KSP's stage DV display:
-    - Split burn into subsegments labeled by stage boundaries.
-    - For each engine ignition stage, iterate down through subsequent decouple stages.
-      For subsegment labeled Y, use only propellant in stage Y-1, then decouple dry mass at Y.
-    - Update engine set when engines are decoupled at Y.
-    This yields small DV portions at early strap-on drops and a large DV portion for the
-    core stage, matching stock staging intuition.
+    Legacy approximate KSP stage DV display.
+
+    This implementation is kept for side-by-side comparisons. Prefer `stage_plan_approx`
+    for corrected stage-event timing and resource mass handling.
     """
     v = conn.space_center.active_vessel
     body = v.orbit.body
@@ -1426,6 +1565,196 @@ def stage_plan_approx(conn, environment: str = "current") -> Dict[str, Any]:
             # Drop dry mass
             mass_current = max(0.1, mass_current - drop_by_stage.get(y, 0.0))
             y -= 1
+
+    return {"stages": plan}
+
+
+def stage_plan_approx(conn, environment: str = "current") -> Dict[str, Any]:
+    """
+    Approximate KSP's stock stage DV display.
+
+    Model:
+      - Iterate stage events from current_stage down to 0.
+      - At stage event Y, drop parts decoupled at Y and ignite engines assigned to Y.
+      - The burn for stage Y consumes propellant in parts decoupled at stage Y-1.
+        (Final propellant that is never decoupled is treated as decouple_stage == -1.)
+
+    Notes:
+      - This is an approximation: we do not fully simulate fuel flow changes across staging
+        (asparagus, fuel lines, crossfeed-enabled decouplers). It is designed to be
+        "stock-like" for common staging patterns.
+    """
+    v = conn.space_center.active_vessel
+    body = v.orbit.body
+    g = float(getattr(body, "surface_gravity", 9.81) or 9.81)
+
+    current_stage = int(getattr(v.control, "current_stage", 0) or 0)
+
+    engines_all = []
+    try:
+        engines_all = list(getattr(v.parts, "engines", []) or [])
+    except Exception:
+        engines_all = []
+
+    def engine_ignition_stage(e) -> int:
+        try:
+            return int(getattr(getattr(e, "part", None), "stage", 0) or 0)
+        except Exception:
+            return 0
+
+    def engine_decouple_stage(e) -> int:
+        try:
+            return int(getattr(getattr(e, "part", None), "decouple_stage", -1) or -1)
+        except Exception:
+            return -1
+
+    engines_by_stage: dict[int, list[Any]] = {}
+    for e in engines_all:
+        engines_by_stage.setdefault(engine_ignition_stage(e), []).append(e)
+
+    # Precompute dry mass drops per decouple stage in one pass for speed.
+    drop_by_stage: dict[int, float] = {}
+    try:
+        for p in getattr(v.parts, "all", []) or []:
+            try:
+                ds = getattr(p, "decouple_stage", None)
+                if ds is None:
+                    continue
+                ds_i = int(ds)
+            except Exception:
+                continue
+            try:
+                dm = getattr(p, "dry_mass", None)
+                if dm is None:
+                    dm = getattr(p, "mass", 0.0)
+                drop_by_stage[ds_i] = drop_by_stage.get(ds_i, 0.0) + float(dm or 0.0)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # Precompute resource masses for parts that never decouple (decouple_stage == -1).
+    minus1_resource_mass_kg: dict[str, float] = {}
+    try:
+        for p in getattr(v.parts, "all", []) or []:
+            try:
+                if int(getattr(p, "decouple_stage", -2) or -2) != -1:
+                    continue
+            except Exception:
+                continue
+            res = getattr(p, "resources", None)
+            if res is None:
+                continue
+            try:
+                for name in list(getattr(res, "names", []) or []):
+                    if not name:
+                        continue
+                    try:
+                        amount = float(res.amount(name))
+                    except Exception:
+                        continue
+                    minus1_resource_mass_kg[str(name)] = minus1_resource_mass_kg.get(str(name), 0.0) + (
+                        amount * _resource_density_kg_per_unit(conn, str(name))
+                    )
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    def propellant_names_for_engines(engines) -> set[str]:
+        names: set[str] = set()
+        for e in engines:
+            try:
+                for n in getattr(e, "propellant_names", []) or []:
+                    if n:
+                        names.add(str(n))
+            except Exception:
+                continue
+        return names
+
+    def prop_mass_kg_for_decouple_stage(stage: int, propellant_names: set[str]) -> float:
+        if not propellant_names:
+            return 0.0
+        if stage >= 0:
+            try:
+                res = v.resources_in_decouple_stage(stage, False)
+                return _resources_mass_kg(conn, res, names_filter=propellant_names)
+            except Exception:
+                return 0.0
+        # stage == -1: fuel that never decouples
+        return sum(minus1_resource_mass_kg.get(n, 0.0) for n in propellant_names)
+
+    def combined_isp_thrust(active_eng):
+        total_thrust = 0.0
+        denom = 0.0
+        count = 0
+        for e in active_eng:
+            try:
+                th = float(getattr(e, "max_thrust", 0.0) or 0.0)
+                if environment == "current":
+                    isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                elif environment in ("vacuum", "sea_level"):
+                    isp = _engine_isp(e, environment) or float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                else:
+                    isp = float(getattr(e, "specific_impulse", 0.0) or 0.0)
+                if th > 0 and isp > 0:
+                    total_thrust += th
+                    denom += th / isp
+                    count += 1
+            except Exception:
+                continue
+        isp = (total_thrust / denom) if denom > 0 else None
+        return isp, total_thrust, count
+
+    mass_current = float(getattr(v, "mass", 0.0) or 0.0)
+    active_eng = []
+    plan = []
+
+    for s in range(current_stage, -1, -1):
+        # Apply stage event: drop parts decoupled at this stage, and update engine set.
+        mass_current = max(0.0, mass_current - drop_by_stage.get(s, 0.0))
+        try:
+            active_eng = [e for e in active_eng if engine_decouple_stage(e) != s]
+        except Exception:
+            pass
+        try:
+            for e in engines_by_stage.get(s, []):
+                # If an engine is decoupled at the same stage it would ignite, it won't
+                # meaningfully contribute to this burn as part of the active vessel.
+                if engine_decouple_stage(e) != s:
+                    active_eng.append(e)
+        except Exception:
+            pass
+
+        propellant_names = propellant_names_for_engines(active_eng)
+        prop = prop_mass_kg_for_decouple_stage(s - 1, propellant_names)
+        isp, thrust, count = combined_isp_thrust(active_eng)
+
+        m0 = mass_current
+        m1 = max(0.0, m0 - prop)
+
+        dv = None
+        twr = None
+        if thrust and g > 0 and m0 > 0:
+            twr = thrust / (m0 * g)
+        if isp and isp > 0 and prop > 0 and m0 > m1 and m1 > 0:
+            from math import log
+            dv = G0 * isp * log(m0 / m1)
+
+        plan.append({
+            "stage": s,
+            "engines": int(count or 0),
+            "max_thrust_n": thrust,
+            "combined_isp_s": isp,
+            "prop_mass_kg": prop,
+            "m0_kg": m0,
+            "m1_kg": m1,
+            "delta_v_m_s": dv,
+            "twr_surface": twr,
+        })
+
+        # Burn to depletion of the stage's propellant allocation.
+        mass_current = m1
 
     return {"stages": plan}
 

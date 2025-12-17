@@ -301,8 +301,26 @@ Returns:
     return blueprints_parts_and_staging.get_stage_plan(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
 
 @mcp.tool()
+def get_stage_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
+    """Legacy version of get_stage_plan kept for side-by-side comparisons."""
+    return blueprints_parts_and_staging.get_stage_plan_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
+
+
+@mcp.tool()
+def get_staging_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
+    """Alias for get_stage_plan (stock-like staging plan)."""
+    return blueprints_parts_and_staging.get_staging_plan(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
+
+
+@mcp.tool()
+def get_staging_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
+    """Legacy version of get_staging_plan kept for side-by-side comparisons."""
+    return blueprints_parts_and_staging.get_staging_plan_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
+
+
+@mcp.tool()
 def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
-    """Approximate per-stage delta‑v and TWR plan using current engine Isp and resource masses.
+    """Approximate per-stage delta-v and TWR plan using current engine Isp and resource masses.
 
 When to use:
   - Quick staging analysis for mission planning and sanity checks.
@@ -315,6 +333,12 @@ Note: Uses standard KSP resource densities and current environment Isp; results 
   For interpretation tips, see resource://playbooks/vessel-blueprint-usage and
   resource://playbooks/launch-ascent-circularize."""
     return blueprints_parts_and_staging.get_staging_info(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
+
+
+@mcp.tool()
+def get_staging_info_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """Legacy version of get_staging_info kept for side-by-side comparisons."""
+    return blueprints_parts_and_staging.get_staging_info_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
 # 🪐📡 Orbit & navigation 🪐📡 ---------------------------------------------------------------------

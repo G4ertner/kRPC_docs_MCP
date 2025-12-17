@@ -109,6 +109,35 @@ def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
             pass
 
 
+def get_stage_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
+    """
+    Legacy approximate stock-like staging plan.
+
+    Kept for side-by-side comparisons with get_stage_plan.
+    """
+    conn = open_connection(address, rpc_port, stream_port, name, timeout)
+    env = (environment or "current").lower()
+    if env not in ("current", "sea_level", "vacuum"):
+        env = "current"
+    try:
+        return json_dumps(readers.stage_plan_approx_legacy(conn, environment=env))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_staging_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
+    """Alias for get_stage_plan (stock-like staging plan)."""
+    return get_stage_plan(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
+
+
+def get_staging_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = "current") -> str:
+    """Alias for get_stage_plan_legacy."""
+    return get_stage_plan_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
+
+
 def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
     Approximate per-stage delta‑v and TWR plan using current engine Isp and resource masses.
@@ -125,6 +154,24 @@ def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000,
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
         return json_dumps(readers.staging_info(conn))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_staging_info_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
+    """
+    Legacy approximate per-stage delta-v/TWR plan.
+
+    Note:
+      This legacy implementation is kept for side-by-side comparisons with
+      the current get_staging_info behavior.
+    """
+    conn = open_connection(address, rpc_port, stream_port, name, timeout)
+    try:
+        return json_dumps(readers.staging_info_legacy(conn))
     finally:
         try:
             conn.close()
