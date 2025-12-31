@@ -201,4 +201,4 @@ def test_resolve_timeouts_preserves_soft_and_bumps_hard_when_needed():
 def test_transient_stream_error_detects_proactor_noise():
     jr = JobRegistry(max_workers=1)
     noisy = "ERROR Exception in callback ProactorBasePipeTransport._call_connection_lost"
-    assert jr._is_transient_stream_error(noisy) is True
+    assert jr._transient_kind(noisy) == "benign_shutdown"

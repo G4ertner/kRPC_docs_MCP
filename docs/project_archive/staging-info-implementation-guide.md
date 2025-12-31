@@ -1,4 +1,6 @@
-# Commander’s Guide: Fixing `get_staging_info` (with legacy side-by-side comparison)
+# (Archived) Commander’s Guide: Fixing `get_staging_info` (with legacy side-by-side comparison)
+
+> Archived note: `get_staging_info` is no longer exposed as an MCP tool (kept internal); this guide is retained for historical context.
 
 This guide turns `docs/staging-info-bug-analysis.md` into a concrete, step-by-step implementation + test plan. It assumes a running KSP + kRPC setup and the GeePT MCP server.
 
@@ -111,4 +113,3 @@ The updated implementation is “better” if it:
 - Produces more stable summaries for planning tools that rely on staging estimates.
 
 If you want, we can add a dedicated MCP tool that returns a structured diff (`legacy` vs `current`) and a simple “quality score” so you can run comparisons directly from chat without running the manual script.
-

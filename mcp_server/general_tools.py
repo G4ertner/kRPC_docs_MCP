@@ -258,7 +258,8 @@ Returns:
           modules: [...], resources: {R:{amount,max}}, crossfeed? } ] }"""
     return blueprints_parts_and_staging.get_part_tree(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
+# @mcp.tool()
 def get_vessel_blueprint(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """Idealized vessel blueprint combining meta, stage plan, engines, control capabilities, and part tree.
 
@@ -269,7 +270,9 @@ Returns:
   JSON with sections: meta, stages, engines, control_capabilities, parts, geometry, notes."""
     return blueprints_parts_and_staging.get_vessel_blueprint(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
+# Kept as an internal debugging helper for humans.
+# @mcp.tool()
 def get_blueprint_ascii(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """Compact ASCII schematic/summary of the current vessel by stage.
 
@@ -279,46 +282,46 @@ and key part category counts (Eng/Tank/Dec/Par/Dock)."""
 
 @mcp.tool()
 def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
-    """Approximate stock‑like staging plan by grouping decouple‑only stages under the
-preceding engine stage.
+    """UI-like staging stack with rounded delta-v and staged parts.
 
 Note:
-  For big rockets this direct call can exceed the 60 s CLI limit. Prefer
-  start_stage_plan_job -> get_job_status(job_id) -> read_resource(result_resource)
-  to fetch the JSON artifact safely, and reserve this helper for quick snapshots.
+  For big rockets this direct call can exceed the 60 s CLI limit.
   For interpretation tips, see resource://playbooks/vessel-blueprint-usage and
   resource://playbooks/launch-ascent-circularize.
 
 When to use:
-  - Match KSP’s staging view for Δv/TWR per engine stage.
+  - Match KSP’s staging stack view.
 
 Args:
   environment: 'current' | 'sea_level' | 'vacuum' — controls Isp used
 
 Returns:
-  JSON: { stages: [ { stage, engines, max_thrust_n, combined_isp_s?, prop_mass_kg,
-  m0_kg, m1_kg, delta_v_m_s?, twr_surface? } ] }."""
+  JSON array of stage rows: [ { stage, engines, delta_v_m_s, combined_isp_s, max_thrust_n, twr_surface, relevant_parts }, ... ]."""
     return blueprints_parts_and_staging.get_stage_plan(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (legacy algorithm kept for regression comparisons).
+# @mcp.tool()
 def get_stage_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
     """Legacy version of get_stage_plan kept for side-by-side comparisons."""
     return blueprints_parts_and_staging.get_stage_plan_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
 
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (pure alias of get_stage_plan).
+# @mcp.tool()
 def get_staging_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
     """Alias for get_stage_plan (stock-like staging plan)."""
     return blueprints_parts_and_staging.get_staging_plan(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
 
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (legacy alias).
+# @mcp.tool()
 def get_staging_plan_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0, environment: str = 'current') -> str:
     """Legacy version of get_staging_plan kept for side-by-side comparisons."""
     return blueprints_parts_and_staging.get_staging_plan_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout, environment=environment)
 
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (alternate delta-v model; keep internal while we validate).
+# @mcp.tool()
 def get_staging_info(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """Approximate per-stage delta-v and TWR plan using current engine Isp and resource masses.
 
@@ -335,7 +338,8 @@ Note: Uses standard KSP resource densities and current environment Isp; results 
     return blueprints_parts_and_staging.get_staging_info(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
 
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface (legacy algorithm kept for regression comparisons).
+# @mcp.tool()
 def get_staging_info_legacy(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """Legacy version of get_staging_info kept for side-by-side comparisons."""
     return blueprints_parts_and_staging.get_staging_info_legacy(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
@@ -422,8 +426,6 @@ def list_launch_sites(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
 def list_launchable_vessels(address: str = DEFAULT_KRPC_ADDRESS, craft_directory: str = 'VAB', rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """List the names of craft files that can be launched from the specified directory ("VAB" or "SPH")."""
     return launch_and_vessel.list_launchable_vessels(address=address, craft_directory=craft_directory, rpc_port=rpc_port, stream_port=stream_port, name=name, timeout=timeout)
-
-
 
 
 @mcp.tool()
@@ -600,8 +602,8 @@ def resource_get_screenshot_file(filename: str):
 
 # 🖼️📤 Blueprints 🖼️📤 ---------------------------------------------------------------------
 
-
-@mcp.tool()
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
+# @mcp.tool()
 def export_blueprint_diagram(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, *, format: str = 'svg', out_dir: str | None = None) -> str:
     """Export a 2D vessel blueprint diagram (SVG/PNG) and expose it as a resource.
 
@@ -616,7 +618,8 @@ def export_blueprint_diagram(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int 
     """
     return blueprints.export_blueprint_diagram(address=address, rpc_port=rpc_port, stream_port=stream_port, name=name, format=format, out_dir=out_dir)
 
-@mcp.resource("resource://staging/latest")
+#@mcp.resource("resource://staging/latest")
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
 def resource_get_latest_staging():
     return blueprints.get_latest_staging()
 
@@ -626,16 +629,19 @@ def resource_get_latest_vessel_blueprint():
     return blueprints.get_latest_vessel_blueprint()
 
 
-@mcp.resource("resource://blueprints/last-diagram.svg")
+#@mcp.resource("resource://blueprints/last-diagram.svg")
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
 def resource_get_last_svg():
     return blueprints.get_last_svg()
 
 
-@mcp.resource("resource://blueprints/last-diagram.png")
+# @mcp.resource("resource://blueprints/last-diagram.png")
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
 def resource_get_last_png():
     return blueprints.get_last_png()
 
 
-@mcp.resource("resource://blueprints/{filename}")
+# @mcp.resource("resource://blueprints/{filename}")
+# Removed from the blessed MCP tool surface (redundant with get_stage_plan).
 def resource_get_blueprint_file(filename: str):
     return blueprints.resource_payload_for(filename)

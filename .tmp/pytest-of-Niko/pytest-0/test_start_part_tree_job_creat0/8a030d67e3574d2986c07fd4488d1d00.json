@@ -1,0 +1,19 @@
+{
+  "job_id": "8a030d67e3574d2986c07fd4488d1d00",
+  "kind": "part_tree",
+  "params": {
+    "address": "1.2.3.4",
+    "name": "Test",
+    "rpc_port": 1234,
+    "stream_port": 2345,
+    "timeout": 1.0
+  },
+  "requested_at": "2025-12-22T19:29:22.776183+00:00",
+  "result": {
+    "parts": [
+      {
+        "id": 1
+      }
+    ]
+  }
+}

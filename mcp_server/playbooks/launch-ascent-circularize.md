@@ -202,7 +202,7 @@ next_step: {next_step}
 5) Useful Follow-up Resources
 - compute_circularize_node(at='apoapsis') for analytical burn targeting.
 - compute_burn_time(dv_m_s) to time warp-to-node precisely.
-- get_stage_plan / get_staging_info for deeper Δv accounting.
+- get_stage_plan for deeper staging accounting.
 
 Notes
 - Always respect licensing when ingesting snippets (exclude_restricted=true if needed).

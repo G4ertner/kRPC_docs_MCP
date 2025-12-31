@@ -185,6 +185,8 @@ def test_benign_shutdown_traceback_is_suppressed():
     job_registry.wait_for(job_id)
 
     # Simulate a common benign asyncio/proactor shutdown traceback on Windows.
+    # This often shows up as an "Exception in callback ..." header followed by a traceback.
+    job_registry.append_log(job_id, "ERROR    Exception in callback base_events.py:1821", stream="stderr")
     job_registry.append_log(job_id, "Traceback (most recent call last):", stream="stderr")
     job_registry.append_log(job_id, '  File "asyncio\\\\proactor_events.py", line 123, in _call_connection_lost', stream="stderr")
     job_registry.append_log(
@@ -196,6 +198,7 @@ def test_benign_shutdown_traceback_is_suppressed():
     payload = json.loads(get_job_status(job_id))
     assert payload["status"] == "SUCCEEDED"
     assert payload["traceback_suppressed"] is True
+    assert payload["log_stream_warning"] is False
     assert all("Traceback (most recent call last):" not in line for line in payload["logs"])
 
 

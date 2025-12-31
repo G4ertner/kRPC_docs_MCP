@@ -1,0 +1,35 @@
+{
+  "job_id": "e658f56ee98e4c109fe7e54b8dff68b1",
+  "kind": "execute_script",
+  "params": {
+    "address": "127.0.0.1",
+    "allow_imports": false,
+    "code": "1/0",
+    "hard_timeout_sec": null,
+    "name": "Test",
+    "rpc_port": 50000,
+    "stream_port": 50001,
+    "timeout_sec": null
+  },
+  "requested_at": "2025-12-22T19:29:22.826339+00:00",
+  "result": {
+    "error": {
+      "message": "float division by zero",
+      "type": "ZeroDivisionError"
+    },
+    "follow_up": {
+      "suggest_get_diagnostics": true
+    },
+    "ok": false,
+    "paused": true,
+    "pre_pause_flight": null,
+    "stderr": "ZeroDivisionError: float division by zero",
+    "stdout": "",
+    "summary": null,
+    "timing": {
+      "exec_time_s": 0.1
+    },
+    "transcript": "Traceback (most recent call last): ...",
+    "unpaused": false
+  }
+}

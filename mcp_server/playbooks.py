@@ -45,3 +45,8 @@ def get_state_checkpoint_playbook() -> str:
 @mcp.resource("resource://playbooks/orbital-return-playbook")
 def get_orbital_return_playbook() -> str:
     return _read("orbital-return-playbook")
+
+
+@mcp.resource("resource://playbooks/warping-playbook")
+def get_warping_playbook() -> str:
+    return _read("warping-playbook")

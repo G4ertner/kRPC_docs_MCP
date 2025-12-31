@@ -5,9 +5,8 @@ Purpose: Provide the agent with a structural understanding of the current vessel
 Recommended Calls:
 - get_status_overview — confirm scene, body, situation
 - get_vessel_blueprint — meta, stages (dv/TWR), engines, parts
-- get_blueprint_ascii — quick human-readable summary (by stage)
+- get_stage_plan — UI-like staging stack (rounded Δv + staged parts)
 - start_part_tree_job + get_job_status → read_resource(result_resource) — retrieve full part tree safely
-- start_stage_plan_job + get_job_status → read_resource(result_resource) — retrieve stock-like stage plan
 
 Key Fields:
 - meta.current_stage — current stage index
@@ -22,12 +21,12 @@ Checklist Before Staging/Burn:
 4) After staging, refresh blueprint to update structure and dv/TWR.
 
 Background job workflow:
-1) Call start_part_tree_job or start_stage_plan_job when you need the heavy artifact.
+1) Call start_part_tree_job when you need the heavy artifact.
 2) Poll get_job_status(job_id) until status == "SUCCEEDED"; inspect logs if FAILED.
 3) Call read_resource(result_resource) to download resource://jobs/<job_id>.json and feed it into your planning.
 
 Notes:
-- Stage plan is an approximation; values differ from KSP UI. Use as planning guidance.
+- Stage plan is an approximation; values can differ from KSP UI. Use as planning guidance.
 - Geometry is best-effort; thrust axis and CoM may be unavailable.
 - If a job fails, read get_job_status logs (power/connection issues, wrong scene) before retrying.
 

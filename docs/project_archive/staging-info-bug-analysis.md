@@ -1,4 +1,6 @@
-# Analysis of Issue 003 — `get_staging_info` stage grouping and delta‑v calculation
+# (Archived) Analysis of Issue 003 — `get_staging_info` stage grouping and delta‑v calculation
+
+> Archived note: `get_staging_info` is no longer exposed as an MCP tool (kept internal); this document is retained for historical context.
 
 ## Does the bug report make sense?
 
@@ -158,4 +160,3 @@ Document limitations and consider leveraging kRPC’s built‑in stage plan func
   https://krpc.github.io/krpc/python/api/space-center/parts.html
 - `DeltaVLib.ks` (kOS)  
   https://github.com/ScranchNew/kOS-Launch-Scripts/blob/master/libraries/DeltaVLib.ks
-

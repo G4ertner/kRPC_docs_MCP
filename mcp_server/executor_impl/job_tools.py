@@ -82,6 +82,15 @@ def _safe_float(x) -> float | None:
         return None
 
 
+def _safe_int(x) -> int | None:
+    try:
+        if x is None:
+            return None
+        return int(x)
+    except Exception:
+        return None
+
+
 def _default_rails_rates() -> list[float]:
     # Stock-like rails warp rates (factor 0..7).
     return [1.0, 5.0, 10.0, 50.0, 100.0, 1000.0, 10000.0, 100000.0]
@@ -116,16 +125,125 @@ def _get_rate_table(sc, *, rails: bool, max_factor: int) -> list[float]:
 
 
 def _choose_factor(*, target_rate: float, rates: list[float]) -> int:
+    """
+    Choose a warp factor given a desired warp multiplier and a discrete rate table.
+
+    Important:
+      - KSP warp rates are discrete (e.g. rails: 1x, 5x, 10x, ...).
+      - If we simply pick the highest rate <= target_rate, then any target_rate in (1, 5)
+        maps to 1x, causing long realtime "waiting" far from the target UT.
+
+    Strategy:
+      Choose the factor whose implied arrival time best matches the requested target real time.
+      In terms of multipliers, this means minimizing abs(target_rate / rate - 1).
+    """
     if not rates:
         return 0
-    chosen = 0
+
+    try:
+        desired = float(target_rate)
+    except Exception:
+        desired = 1.0
+
+    best_idx = 0
+    best_err = float("inf")
+    best_rate = None
     for i, r in enumerate(rates):
         try:
-            if float(r) <= float(target_rate) + 1e-9:
-                chosen = i
+            rate = float(r)
         except Exception:
             continue
-    return chosen
+        if not (rate > 0):
+            continue
+
+        # Relative error vs ideal: remaining/rate ~= remaining/desired.
+        # Scale-free form: desired/rate ~= 1.
+        err = abs((desired / rate) - 1.0)
+
+        if (err + 1e-12) < best_err:
+            best_idx = i
+            best_err = err
+            best_rate = rate
+            continue
+
+        # Tie-break toward faster warp when errors are effectively equal.
+        if abs(err - best_err) <= 1e-12:
+            if best_rate is None or rate > best_rate:
+                best_idx = i
+                best_rate = rate
+
+    return best_idx
+
+
+def _nearest_factor_index(*, rate: float, rates: list[float]) -> int:
+    if not rates:
+        return 0
+    best_idx = 0
+    best_err = float("inf")
+    for i, r in enumerate(rates):
+        rr = _safe_float(r)
+        if rr is None or rr <= 0:
+            continue
+        err = abs(float(rate) - rr)
+        if err < best_err:
+            best_idx = i
+            best_err = err
+    return best_idx
+
+
+def _compute_desired_rate(
+    *,
+    remaining_game_s: float,
+    settle_at_s: float,
+    target_real_time_s: float,
+    elapsed_wall_s: float,
+    min_wall_budget_s: float = 0.5,
+) -> float:
+    """
+    Compute the desired warp multiplier for a warp job iteration.
+
+    Note:
+      - `target_real_time_s` is a total wall-time goal, not a per-step goal.
+      - When we're behind schedule (elapsed_wall_s > target_real_time_s), we should not
+        collapse to 1x far from the target; instead, keep warping (bounded by safety).
+      - Within `settle_at_s` of the target UT, always request realtime to minimize overshoot.
+    """
+    remaining = float(remaining_game_s)
+    if remaining <= float(settle_at_s):
+        return 1.0
+
+    target_total = max(1.0, float(target_real_time_s))
+    budget = max(float(min_wall_budget_s), target_total - float(elapsed_wall_s))
+    desired = remaining / budget if budget > 0 else remaining
+    return max(1.0, float(desired))
+
+
+def _compute_sleep_s(
+    *,
+    remaining_game_s: float,
+    settle_at_s: float,
+    expected_rate: float,
+    base_sleep_s: float = 0.25,
+    min_sleep_s: float = 0.02,
+) -> float:
+    """
+    Choose a polling interval for the warp loop.
+
+    Rationale: at high warp rates and small remaining times, using a fixed 0.25 s step can
+    overshoot the target UT by a large margin. We shrink the poll interval when close.
+    """
+    remaining = float(remaining_game_s)
+    base = float(base_sleep_s)
+    expected = max(1.0, float(expected_rate))
+
+    # Far from target, keep the loop coarse.
+    close_threshold = max(30.0, 5.0 * float(settle_at_s))
+    if remaining > close_threshold:
+        return base
+
+    # Near target, cap the expected game-time advance per poll.
+    max_game_step = max(0.5, float(settle_at_s) / 2.0)
+    return max(float(min_sleep_s), min(base, max_game_step / expected))
 
 
 def _set_warp_factor(sc, *, rails: bool, factor: int) -> None:
@@ -177,7 +295,10 @@ def start_part_tree_job(
     return _start_reader_job(kind="part_tree", params=params, reader=readers.part_tree)
 
 
-@mcp.tool()
+# Removed from the blessed MCP tool surface: get_stage_plan is fast enough and returns the
+# UI-matching schema (rounded DV + relevant_parts). Keeping the job starter as internal code
+# in case we want to reintroduce a long-running variant later.
+# @mcp.tool()
 def start_stage_plan_job(
     address: str = DEFAULT_KRPC_ADDRESS,
     rpc_port: int = 50000,
@@ -187,15 +308,7 @@ def start_stage_plan_job(
     timeout: float = 5.0,
     environment: str = "current",
 ) -> str:
-    """
-    Start a background job that computes the per-stage delta-v/TWR plan via readers.stage_plan_approx.
-
-    Usage pattern:
-        1. Call start_stage_plan_job(...) (optionally choose environment) to enqueue the work.
-        2. Poll get_job_status(job_id) until status is SUCCEEDED.
-        3. Call read_resource on the result_resource (resource://jobs/<id>.json) to download the stage plan JSON.
-        4. Incorporate the staging data into your burn planning workflow (e.g., playbooks, scripts).
-    """
+    """Internal helper (not exposed as an MCP tool)."""
     params = {
         "address": address,
         "rpc_port": rpc_port,
@@ -342,10 +455,13 @@ def _start_warp_job_impl(*, params: dict) -> str:
 
                 settle_at_s = float(params.get("settle_at_s", 2.0))
                 target_real_time_s = max(1.0, float(params.get("target_real_time_s", 10.0)))
-                if remaining <= settle_at_s:
-                    desired_rate = 1.0
-                else:
-                    desired_rate = max(1.0, remaining / target_real_time_s)
+                elapsed_wall = time.time() - start_wall
+                desired_rate = _compute_desired_rate(
+                    remaining_game_s=remaining,
+                    settle_at_s=settle_at_s,
+                    target_real_time_s=target_real_time_s,
+                    elapsed_wall_s=elapsed_wall,
+                )
 
                 desired_factor = _choose_factor(target_rate=desired_rate, rates=rates)
                 if current_factor != desired_factor:
@@ -356,9 +472,21 @@ def _start_warp_job_impl(*, params: dict) -> str:
                 if observed_rate is None and 0 <= desired_factor < len(rates):
                     observed_rate = rates[desired_factor]
 
+                expected_rate = None
+                try:
+                    expected_rate = float(rates[desired_factor]) if 0 <= desired_factor < len(rates) else None
+                except Exception:
+                    expected_rate = None
+
+                sleep_s = _compute_sleep_s(
+                    remaining_game_s=remaining,
+                    settle_at_s=settle_at_s,
+                    expected_rate=float(expected_rate or observed_rate or 1.0),
+                )
+
                 # Detect "warp didn't engage" conditions.
                 if last_ut is not None and now_ut <= last_ut + 1e-6:
-                    no_progress_s += 0.25
+                    no_progress_s += float(sleep_s)
                 else:
                     no_progress_s = 0.0
                 last_ut = now_ut
@@ -376,9 +504,23 @@ def _start_warp_job_impl(*, params: dict) -> str:
                 wall = time.time() - start_wall
                 if wall - last_log_wall >= 0.5 or remaining <= 30:
                     last_log_wall = wall
-                    handle.log(f"[warp] UT={now_ut:.1f} remaining={remaining:.1f}s factor={desired_factor} rate={observed_rate:g}")
 
-                time.sleep(0.25)
+                    factor_attr = "rails_warp_factor" if rails else "physics_warp_factor"
+                    observed_factor = _safe_int(getattr(sc, factor_attr, None))
+                    effective_factor = None
+                    try:
+                        if observed_rate is not None:
+                            effective_factor = _nearest_factor_index(rate=float(observed_rate), rates=rates)
+                    except Exception:
+                        effective_factor = None
+                    handle.log(
+                        f"[warp] UT={now_ut:.1f} remaining={remaining:.1f}s "
+                        f"desired_rate={desired_rate:g} requested_factor={desired_factor} "
+                        f"observed_factor={observed_factor} observed_rate={observed_rate:g} "
+                        f"effective_factor={effective_factor}"
+                    )
+
+                time.sleep(float(sleep_s))
 
             _reset_warp(sc)
             final_time = readers.time_status(conn) if hasattr(readers, "time_status") else {}

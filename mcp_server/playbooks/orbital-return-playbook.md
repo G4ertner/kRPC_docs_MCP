@@ -6,7 +6,7 @@
 
 ## Vessel Snapshot
 **Reason:** Get an understanding of the vessel's structure and current staging situation
-**Tools:** get_staging_plan, get_part_tree
+**Tools:** get_stage_plan, get_part_tree
 **Example:**
 - Mass ~29.7 t; only the vacuum engine/tank stage and the capsule with heat shield/parachute stack remain thanks to the latest quicksave.
 - Reaction wheels/RCS units are ready for attitude corrections; ~30 units of monopropellant stay available for fine alignment nudges.
@@ -55,4 +55,3 @@
 - Compare heading and pitch directly to flight.retrograde rather than to flight.prograde so the guard cannot see a 180-degree difference.
 - Stage off every booster above the capsule immediately after the retro burn so the heat shield faces the flow.
 - Log heading error, pitch error, periapsis, apoapsis, and current stage at key events so the next LLM can determine the ship’s state precisely.
-

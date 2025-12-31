@@ -1,0 +1,17 @@
+{
+  "job_id": "42024b33c1f446d6a3773def1bf320aa",
+  "kind": "stage_plan",
+  "params": {
+    "address": "1.2.3.4",
+    "environment": "vacuum",
+    "name": null,
+    "rpc_port": 1111,
+    "stream_port": 2222,
+    "timeout": 2.0
+  },
+  "requested_at": "2025-12-22T19:29:22.793351+00:00",
+  "result": {
+    "env": "vacuum",
+    "stages": []
+  }
+}

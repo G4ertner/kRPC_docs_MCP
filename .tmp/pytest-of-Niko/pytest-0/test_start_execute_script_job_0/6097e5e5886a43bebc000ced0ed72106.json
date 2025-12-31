@@ -1,0 +1,29 @@
+{
+  "job_id": "6097e5e5886a43bebc000ced0ed72106",
+  "kind": "execute_script",
+  "params": {
+    "address": "127.0.0.1",
+    "allow_imports": false,
+    "code": "print('hi')",
+    "hard_timeout_sec": null,
+    "name": "Test",
+    "rpc_port": 50000,
+    "stream_port": 50001,
+    "timeout_sec": null
+  },
+  "requested_at": "2025-12-22T19:29:22.810238+00:00",
+  "result": {
+    "error": null,
+    "ok": true,
+    "paused": true,
+    "pre_pause_flight": null,
+    "stderr": "",
+    "stdout": "print",
+    "summary": "done",
+    "timing": {
+      "exec_time_s": 1.0
+    },
+    "transcript": "print\\nSUMMARY: done",
+    "unpaused": false
+  }
+}

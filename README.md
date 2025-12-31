@@ -81,8 +81,8 @@ Each builder has its own `pyproject.toml`, README, and duplicated helper modules
 ### Tool runtime behavior (timeouts)
 
 - Sync tools now run off the event loop in a worker thread with a 60s hard cap to avoid freezing the server when kRPC hangs.
-- Long-running job starters (`start_part_tree_job`, `start_stage_plan_job`, `start_execute_script_job`) and `execute_script` are exempt; they rely on their own watchdogs.
-- If a tool might exceed 60s (e.g., part tree/stage plan), prefer the start_* job variants to stream logs and stay responsive.
+- Long-running job starters (`start_part_tree_job`, `start_execute_script_job`, `start_warp_job`) and `execute_script` are exempt; they rely on their own watchdogs.
+- If a tool might exceed 60s (e.g., part tree), prefer the start_* job variants to stream logs and stay responsive.
 
 ## Core capabilities
 
@@ -104,10 +104,7 @@ Need your LLM to inspect your craft? The blueprint tools expose:
 
 - `get_vessel_blueprint`: returns a JSON blueprint with metadata, stages, engines and parts.
 - `get_part_tree`: returns a hierarchical list of all parts with parent/child relationships, modules and resources.
-- `get_blueprint_ascii`: produces a LLM-readable per‑stage summary of the vessel.
-- `get_stage_plan`: provides a stock-like stage plan (thrust, Isp, Δv).
-- `get_staging_info`: returns per-stage Δv/TWR estimates.
-- `get_staging_info_legacy`: legacy version of `get_staging_info` for comparisons.
+- `get_stage_plan`: provides a UI-like staging stack (rounded Δv + staged parts).
 - `export_blueprint_diagram`: generates a diagram (SVG or PNG) of your vessel’s staging and structure.  
 
 These tools let your LLM understand the craft’s structure, plan staging and fuel usage to generate vessel specific flight plans and mission profiles
@@ -199,13 +196,10 @@ On top of that, the MCP server comes with a whole set of hardcoded tools your LL
 
 #### 🧱 Blueprints, Parts & Staging
 - `get_vessel_blueprint` — Idealized craft blueprint (stages, engines, parts).
-- `get_blueprint_ascii` — Compact ASCII stage summary with Δv/TWR.
 - `get_part_tree` — Hierarchical part tree with resources.
-- `get_stage_plan` — Stock-like stage plan (thrust, Isp, Δv).
-- `get_staging_info` — Per-stage Δv/TWR estimates.
-- `get_staging_info_legacy` — Legacy version of `get_staging_info` for comparisons.
+- `get_stage_plan` — UI-like staging stack (rounded Δv + staged parts).
 - `export_blueprint_diagram` — Exports a 2D blueprint diagram (SVG/PNG).
-- `start_part_tree_job` / `start_stage_plan_job` - Kick off background jobs that produce the same JSON artifacts without hitting tool timeouts.
+- `start_part_tree_job` - Kick off a background job that produces the same JSON artifact without hitting tool timeouts.
 - `get_job_status` - Polls job state/logs and exposes the `result_resource` URI once the artifact is ready.
 
 **Background job workflow (long-running tooling)**

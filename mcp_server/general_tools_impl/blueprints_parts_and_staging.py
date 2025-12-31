@@ -82,9 +82,7 @@ def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
     preceding engine stage.
 
     Note:
-      For big rockets this direct call can exceed the 60 s CLI limit. Prefer
-      start_stage_plan_job -> get_job_status(job_id) -> read_resource(result_resource)
-      to fetch the JSON artifact safely, and reserve this helper for quick snapshots.
+      For big rockets this direct call can exceed the 60 s CLI limit.
 
     When to use:
       - Match KSP’s staging view for Δv/TWR per engine stage.
@@ -93,15 +91,155 @@ def get_stage_plan(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000, s
       environment: 'current' | 'sea_level' | 'vacuum' — controls Isp used
 
     Returns:
-      JSON: { stages: [ { stage, engines, max_thrust_n, combined_isp_s?, prop_mass_kg,
-      m0_kg, m1_kg, delta_v_m_s?, twr_surface? } ] }.
+      JSON array of stage rows, sorted ascending by stage number:
+        [ { stage, engines, delta_v_m_s (int|null), combined_isp_s, max_thrust_n, twr_surface,
+            relevant_parts: [part_title, ...] }, ... ]
     """
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     env = (environment or "current").lower()
     if env not in ("current", "sea_level", "vacuum"):
         env = "current"
     try:
-        return json_dumps(readers.stage_plan_approx(conn, environment=env))
+        v = conn.space_center.active_vessel
+        raw = readers.stage_plan_approx(conn, environment=env) or {}
+        segs = raw.get("stages", []) if isinstance(raw, dict) else []
+
+        seg_by_stage: dict[int, dict] = {}
+        for seg in segs:
+            try:
+                seg_by_stage[int(seg.get("stage"))] = seg
+            except Exception:
+                continue
+
+        def _safe_stage(x):
+            try:
+                if x is None:
+                    return None
+                s = int(x)
+                return s if s >= 0 else None
+            except Exception:
+                return None
+
+        def _module_names(part) -> list[str]:
+            try:
+                mods = getattr(part, "modules", None)
+                if mods is None:
+                    return []
+                names = []
+                for m in list(mods) or []:
+                    try:
+                        n = getattr(m, "name", None)
+                        if n:
+                            names.append(str(n))
+                    except Exception:
+                        continue
+                return names
+            except Exception:
+                return []
+
+        def _has_attr(obj, attr: str) -> bool:
+            try:
+                return getattr(obj, attr, None) is not None
+            except Exception:
+                return False
+
+        def _stage_category(part) -> str | None:
+            # Prefer kRPC typed accessors when present (fast, reliable).
+            if _has_attr(part, "engine"):
+                return "engine"
+            if _has_attr(part, "decoupler") or _has_attr(part, "separator"):
+                return "decouple"
+            if _has_attr(part, "parachute"):
+                return "parachute"
+            if _has_attr(part, "launch_clamp"):
+                return "clamp"
+            if _has_attr(part, "solar_panel"):
+                return "solar"
+            if _has_attr(part, "antenna"):
+                return "antenna"
+
+            # Module-name heuristics (covers fairings and many modded parts).
+            mods = _module_names(part)
+            if not mods:
+                return None
+
+            for n in mods:
+                if n == "ModuleLaunchClamp" or "LaunchClamp" in n:
+                    return "clamp"
+                if n == "ModuleProceduralFairing" or "ProceduralFairing" in n or "Fairing" in n:
+                    return "fairing"
+                if n == "ModuleJettison" or "Jettison" in n:
+                    return "fairing"
+                if "Decouple" in n or "AnchoredDecoupler" in n or "Separator" in n:
+                    return "decouple"
+                if "Parachute" in n or "RealChute" in n:
+                    return "parachute"
+                if "Engines" in n or n in ("ModuleEngines", "ModuleEnginesFX"):
+                    return "engine"
+                if "SolarPanel" in n:
+                    return "solar"
+                if "Antenna" in n or "DataTransmitter" in n:
+                    return "antenna"
+                if "ScienceExperiment" in n:
+                    return "science"
+
+            return None
+
+        category_order = ("engine", "decouple", "clamp", "fairing", "parachute", "solar", "antenna", "science")
+        stage_parts: dict[int, dict[str, list[str]]] = {}
+        try:
+            for p in list(getattr(v.parts, "all", []) or []):
+                s = _safe_stage(getattr(p, "stage", None))
+                if s is None:
+                    continue
+                cat = _stage_category(p)
+                if cat is None:
+                    continue
+                try:
+                    title = getattr(p, "title", None) or getattr(p, "name", None) or "Unknown Part"
+                except Exception:
+                    title = "Unknown Part"
+                stage_parts.setdefault(int(s), {}).setdefault(cat, []).append(str(title))
+        except Exception:
+            stage_parts = {}
+
+        relevant_parts_by_stage: dict[int, list[str]] = {}
+        for s, cats in stage_parts.items():
+            combined: list[str] = []
+            for cat in category_order:
+                combined.extend(cats.get(cat, []))
+            for cat, items in cats.items():
+                if cat not in category_order:
+                    combined.extend(items)
+            relevant_parts_by_stage[int(s)] = combined
+
+        stage_nums = set(seg_by_stage.keys()) | set(relevant_parts_by_stage.keys())
+        out = []
+        for s in sorted(stage_nums):
+            seg = seg_by_stage.get(int(s), {}) or {}
+            dv = seg.get("delta_v_m_s")
+            dv_int = None
+            try:
+                if dv is not None:
+                    dv_int = int(round(float(dv)))
+            except Exception:
+                dv_int = None
+
+            relevant = relevant_parts_by_stage.get(int(s), [])
+            if dv_int is None and not relevant:
+                continue
+
+            out.append({
+                "stage": int(s),
+                "engines": int(seg.get("engines") or 0),
+                "delta_v_m_s": dv_int,
+                "combined_isp_s": seg.get("combined_isp_s"),
+                "max_thrust_n": float(seg.get("max_thrust_n") or 0.0),
+                "twr_surface": seg.get("twr_surface"),
+                "relevant_parts": relevant,
+            })
+
+        return json_dumps(out)
     finally:
         try:
             conn.close()

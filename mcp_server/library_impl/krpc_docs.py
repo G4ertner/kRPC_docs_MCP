@@ -94,9 +94,11 @@ def get_job_status_impl(job_id: str) -> dict:
     Poll the status of a background job started by tools such as start_part_tree_job.
 
     Usage pattern:
-        1. Call a job-starting tool (e.g., start_part_tree_job/start_stage_plan_job) to get a job_id.
+        1. Call a job-starting tool (e.g., start_part_tree_job/start_warp_job/start_execute_script_job) to get a job_id.
         2. Poll get_job_status(job_id) until "status" == "SUCCEEDED" (or FAILED for troubleshooting).
         3. When SUCCEEDED, call read_resource on "result_resource" (resource://jobs/<id>.json) to fetch the artifact.
+           For execute_script jobs, the artifact contains the full post-run transcript under
+           result.transcript (and also result.stdout/result.stderr).
         4. If FAILED, inspect logs/error, address the issue, and optionally restart the job.
 
     Returns:
@@ -104,7 +106,7 @@ def get_job_status_impl(job_id: str) -> dict:
             - job_id: the requested identifier
             - status: PENDING | RUNNING | SUCCEEDED | FAILED | CANCELLED (or UNKNOWN when not found)
             - created_at / started_at / finished_at timestamps (ISO 8601, UTC) when available
-            - logs: accumulated stdout/stderr/log entries
+            - logs: incremental stdout/stderr/log entries since the last poll for this job_id
             - log_stream_warning: true when transient log transport errors were suppressed
             - result_resource: resource URI containing the job output, if produced
             - error: error description when failed or unknown
@@ -114,6 +116,8 @@ def get_job_status_impl(job_id: str) -> dict:
         Notes:
             - Logs are delivered incrementally per job_id. Subsequent calls only return new entries
               prefixed with "continuing logs:" and numbered to preserve ordering.
+            - For post-mortems, prefer reading the job artifact via result_resource (resource://jobs/<id>.json).
+              In particular, execute_script job artifacts include the full transcript.
     """
     state = job_registry.get_state(job_id)
     if state is None:

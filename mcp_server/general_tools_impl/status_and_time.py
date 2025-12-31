@@ -143,6 +143,7 @@ def _warp_monitor(
     timeout: float = 2.0,
     *,
     target_ut: float | None = None,
+    preferred_mode: str | None = None,
 ) -> dict:
     """Internal helper: compact timewarp monitoring snapshot for logs/status polling.
 
@@ -158,28 +159,226 @@ def _warp_monitor(
     conn = open_connection(address, rpc_port, stream_port, name, timeout)
     try:
         sc = conn.space_center
+
+        def _safe_float(x) -> float | None:
+            try:
+                if x is None:
+                    return None
+                return float(x)
+            except Exception:
+                return None
+
+        def _safe_int(x) -> int | None:
+            try:
+                if x is None:
+                    return None
+                return int(x)
+            except Exception:
+                return None
+
+        def _default_rails_rates() -> list[float]:
+            return [1.0, 5.0, 10.0, 50.0, 100.0, 1000.0, 10000.0, 100000.0]
+
+        def _default_physics_rates() -> list[float]:
+            return [1.0, 2.0, 3.0, 4.0]
+
+        def _get_rate_table(*, rails: bool) -> list[float]:
+            attr = "rails_warp_factors" if rails else "physics_warp_factors"
+            rates = None
+            if hasattr(sc, attr):
+                try:
+                    raw = list(getattr(sc, attr))
+                    parsed: list[float] = []
+                    for item in raw:
+                        val = _safe_float(item)
+                        if val is not None and val > 0:
+                            parsed.append(val)
+                    if parsed:
+                        rates = parsed
+                except Exception:
+                    rates = None
+            if rates is None:
+                rates = _default_rails_rates() if rails else _default_physics_rates()
+            return rates
+
+        def _nearest_factor(*, rate: float, rails: bool) -> tuple[int, float | None, float | None]:
+            rates = _get_rate_table(rails=rails)
+            if not rates:
+                return 0, None, None
+            best_i = 0
+            best_r = _safe_float(rates[0]) or 1.0
+            best_err = float("inf")
+            for i, r in enumerate(rates):
+                rr = _safe_float(r)
+                if rr is None or rr <= 0:
+                    continue
+                err = abs(float(rate) - rr)
+                if err < best_err:
+                    best_i = i
+                    best_r = rr
+                    best_err = err
+            rel = (best_err / best_r) if best_r else None
+            return best_i, best_r, rel
+
+        def _read_legacy_state() -> dict:
+            state: dict = {}
+            try:
+                if hasattr(sc, "warp_rate"):
+                    state["warp_rate"] = _safe_float(getattr(sc, "warp_rate", None))
+            except Exception:
+                pass
+            for attr in ("rails_warp_factor", "physics_warp_factor"):
+                try:
+                    if hasattr(sc, attr):
+                        state[attr] = _safe_int(getattr(sc, attr, None))
+                except Exception:
+                    pass
+            return state
+
+        def _infer_mode(*, tw_mode_name: str | None, legacy_state: dict, preferred: str | None) -> str | None:
+            if tw_mode_name in {"rails", "physics"}:
+                return tw_mode_name
+            try:
+                if (legacy_state.get("rails_warp_factor") or 0) > 0:
+                    return "rails"
+            except Exception:
+                pass
+            try:
+                if (legacy_state.get("physics_warp_factor") or 0) > 0:
+                    return "physics"
+            except Exception:
+                pass
+            if preferred in {"rails", "physics"}:
+                return preferred
+            return None
+
+        def _is_legacy_consistent(*, mode: str | None, legacy_state: dict, effective_rate: float) -> bool:
+            # Realtime is always considered consistent.
+            if effective_rate <= 1.01:
+                return True
+
+            if mode == "rails":
+                f = legacy_state.get("rails_warp_factor")
+                if f is None:
+                    # Cannot validate factor; avoid claiming an inconsistency.
+                    return True
+                implied, _r, rel = _nearest_factor(rate=effective_rate, rails=True)
+                return implied == int(f) or (rel is not None and rel <= 0.05)
+
+            if mode == "physics":
+                f = legacy_state.get("physics_warp_factor")
+                if f is None:
+                    # Cannot validate factor; avoid claiming an inconsistency.
+                    return True
+                implied, _r, rel = _nearest_factor(rate=effective_rate, rails=False)
+                return implied == int(f) or (rel is not None and rel <= 0.05)
+
+            rails_f = legacy_state.get("rails_warp_factor")
+            phys_f = legacy_state.get("physics_warp_factor")
+            if rails_f is None and phys_f is None:
+                # No factors available; cannot validate.
+                return True
+            if rails_f is not None and int(rails_f) > 0:
+                implied, _r, rel = _nearest_factor(rate=effective_rate, rails=True)
+                return implied == int(rails_f) or (rel is not None and rel <= 0.05)
+            if phys_f is not None and int(phys_f) > 0:
+                implied, _r, rel = _nearest_factor(rate=effective_rate, rails=False)
+                return implied == int(phys_f) or (rel is not None and rel <= 0.05)
+            return False
+
+        def _settle_legacy_state(
+            *,
+            tw_mode_name: str | None,
+            preferred: str | None,
+            effective_rate: float,
+            wait_s: float = 0.25,
+            poll_s: float = 0.02,
+        ) -> tuple[dict, bool]:
+            last = _read_legacy_state()
+            mode = _infer_mode(tw_mode_name=tw_mode_name, legacy_state=last, preferred=preferred)
+            if _is_legacy_consistent(mode=mode, legacy_state=last, effective_rate=effective_rate):
+                return last, True
+
+            deadline = time.monotonic() + max(0.0, float(wait_s))
+            while time.monotonic() < deadline:
+                time.sleep(max(0.0, float(poll_s)))
+                cur = _read_legacy_state()
+                mode = _infer_mode(tw_mode_name=tw_mode_name, legacy_state=cur, preferred=preferred)
+                if _is_legacy_consistent(mode=mode, legacy_state=cur, effective_rate=effective_rate):
+                    return cur, True
+                last = cur
+            return last, False
+
         out: dict = {"universal_time_s": getattr(sc, "ut", None)}
 
         # Warp object (newer kRPC)
         tw = getattr(sc, "warp", None)
+        tw_rate: float | None = None
+        tw_mode_name: str | None = None
         if tw is not None:
             try:
                 out["timewarp_rate"] = getattr(tw, "rate", None)
+                tw_rate = _safe_float(out.get("timewarp_rate"))
             except Exception:
                 pass
             try:
                 mode = getattr(tw, "mode", None)
                 out["timewarp_mode"] = getattr(mode, "name", None) or str(mode)
+                raw_mode = out.get("timewarp_mode")
+                tw_mode_name = (str(raw_mode).lower().strip() if raw_mode else None)
             except Exception:
                 pass
 
-        # Legacy properties (older kRPC)
-        for attr in ("warp_rate", "rails_warp_factor", "physics_warp_factor"):
-            try:
-                if hasattr(sc, attr):
-                    out[attr] = getattr(sc, attr)
-            except Exception:
-                pass
+        # Prefer Warp.rate when available; fall back to legacy warp_rate.
+        rate_effective = tw_rate
+        rate_source = "warp.rate"
+        if rate_effective is None:
+            legacy_rate = _safe_float(getattr(sc, "warp_rate", None))
+            if legacy_rate is not None:
+                rate_effective = legacy_rate
+                rate_source = "space_center.warp_rate"
+        if rate_effective is None or rate_effective <= 0:
+            rate_effective = 1.0
+            rate_source = "default(1.0)"
+
+        normalized_preferred = None
+        try:
+            normalized_preferred = str(preferred_mode).lower().strip() if preferred_mode else None
+        except Exception:
+            normalized_preferred = None
+
+        legacy_state, stable = _settle_legacy_state(
+            tw_mode_name=tw_mode_name,
+            preferred=normalized_preferred,
+            effective_rate=float(rate_effective),
+        )
+        out.update(legacy_state)
+        out["telemetry_stable"] = stable
+
+        mode_effective = _infer_mode(tw_mode_name=tw_mode_name, legacy_state=legacy_state, preferred=normalized_preferred)
+        out["warp_mode_effective"] = mode_effective
+        out["warp_rate_effective"] = float(rate_effective)
+        out["warp_rate_source"] = rate_source
+
+        # Effective factor: always return a value when we can compute it from the rate.
+        # At ~1x, treat as realtime factor 0 regardless of mode ambiguity.
+        if float(rate_effective) <= 1.01:
+            out["warp_factor_effective"] = 0
+        else:
+            out["warp_factor_effective"] = None
+            if mode_effective == "rails":
+                f, _r, _rel = _nearest_factor(rate=float(rate_effective), rails=True)
+                out["warp_factor_effective"] = int(f)
+            elif mode_effective == "physics":
+                f, _r, _rel = _nearest_factor(rate=float(rate_effective), rails=False)
+                out["warp_factor_effective"] = int(f)
+            else:
+                # Mode unknown: pick whichever table matches the multiplier better.
+                fr, _rr, relr = _nearest_factor(rate=float(rate_effective), rails=True)
+                fp, _rp, relp = _nearest_factor(rate=float(rate_effective), rails=False)
+                relr_val = relr if relr is not None else float("inf")
+                relp_val = relp if relp is not None else float("inf")
+                out["warp_factor_effective"] = int(fr if relr_val <= relp_val else fp)
 
         # Compute ETA (real seconds) from remaining game seconds and current warp multiplier.
         if target_ut is not None:
@@ -192,24 +391,9 @@ def _warp_monitor(
                 out["target_ut"] = float(target_ut)
                 out["remaining_game_time_s"] = remaining_game_s
 
-                # Prefer Warp.rate when available; fall back to legacy warp_rate.
-                rate = None
-                try:
-                    rate = float(out.get("timewarp_rate")) if out.get("timewarp_rate") is not None else None
-                    out["warp_rate_source"] = "warp.rate"
-                except Exception:
-                    rate = None
-                if rate is None:
-                    try:
-                        rate = float(out.get("warp_rate")) if out.get("warp_rate") is not None else None
-                        out["warp_rate_source"] = "space_center.warp_rate"
-                    except Exception:
-                        rate = None
-                if rate is None or rate <= 0:
-                    rate = 1.0
-                    out["warp_rate_source"] = "default(1.0)"
-                out["warp_rate_effective"] = rate
-                out["estimated_remaining_real_s"] = max(0.0, remaining_game_s) / rate if remaining_game_s > 0 else 0.0
+                out["estimated_remaining_real_s"] = (
+                    max(0.0, remaining_game_s) / float(rate_effective) if remaining_game_s > 0 else 0.0
+                )
         return out
     finally:
         try:

@@ -4,7 +4,7 @@ Async kRPC Tooling Implementation Plan
 Context check:
 - The server uses `mcp.server.fastmcp` (not the standalone `fastmcp` package), and tools run on the asyncio loop directly unless they are `async def`.
 - All kRPC helpers go through `mcp_server/utils/krpc_helpers.open_connection` -> `krpc_utils.client.connect_to_game` (blocking).
-- Most tools live in `mcp_server/general_tools.py` calling sync impls in `general_tools_impl/*`; start-job tools (e.g., `start_part_tree_job`, `start_stage_plan_job`, `start_execute_script_job`) already run in a ThreadPool via `executor_impl.jobs.JobRegistry`.
+- Most tools live in `mcp_server/general_tools.py` calling sync impls in `general_tools_impl/*`; start-job tools (e.g., `start_part_tree_job`, `start_execute_script_job`) already run in a ThreadPool via `executor_impl.jobs.JobRegistry`.
 - Direct `execute_script` is sync and can run long; it has its own internal hard timeout, so it should be run off-loop but not clamped to the 60s Codex limit.
 
 - [x] Add async wrappers (non-invasive to impls)
@@ -18,7 +18,7 @@ Context check:
   - [x] Keep a short allowlist exempt from the 60s clamp when they have their own safety nets (e.g., `execute_script` `hard_timeout_sec`; start-job tools stay exempt).
 
 - [x] Preserve long-running start-job / job-backed tools
-  - [x] Leave `start_part_tree_job`, `start_stage_plan_job`, `start_execute_script_job` (and other job_registry-backed starters) as-is; they already execute in a ThreadPool and are exempt from the 60s clamp.
+- [x] Leave `start_part_tree_job`, `start_execute_script_job` (and other job_registry-backed starters) as-is; they already execute in a ThreadPool and are exempt from the 60s clamp.
   - [x] Treat direct `execute_script` as exempt from the 60s clamp; it relies on its internal `hard_timeout_sec`.
 
 - [x] Injection compatibility and plumbing

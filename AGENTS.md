@@ -121,7 +121,7 @@ GeePT follows a disciplined main loop built around the MCP toolset. Each phase c
 Use blueprint inspection tools to understand the craft before acting:
 
 - `get_vessel_blueprint` to retrieve a JSON description of all stages and engines.
-- `get_staging_info` or `get_stage_plan` for Δv and TWR breakdowns.
+- `get_stage_plan` for Δv and TWR breakdowns.
 - `get_part_tree` and `export_blueprint_diagram` to visualize structure and detect issues.
 
 ### Step 2 — Create Mission Plan in Steps to Execute
@@ -189,4 +189,3 @@ Use these playbooks to structure your plan and tool calls before generating scri
 When you edit or add code to the GeePT MCP repo, you will have to restart the server in order to see the changes reflected when actually using geept_mcp tools.
 
 From the repo root, run `restart_mcp_server.bat` to restart the MCP server and pick up your changes. This script stops any running `mcp_server.main` instance first, then starts a fresh one.
-

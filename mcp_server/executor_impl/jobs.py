@@ -10,9 +10,9 @@ The registry is responsible for:
 
 from __future__ import annotations
 
-import contextlib
 import io
 import re
+import sys
 import threading
 import time
 import uuid
@@ -105,6 +105,75 @@ class _LogStream(io.TextIOBase):
             self._buffer = ""
 
 
+class _ThreadLocalStreamProxy(io.TextIOBase):
+    """
+    sys.stdout/sys.stderr proxy that supports thread-local capture streams.
+
+    Important: `contextlib.redirect_stdout/redirect_stderr` mutate process-global `sys.stdout`
+    and `sys.stderr`, so any other thread writing during a job run (e.g., asyncio server noise
+    on Windows) can leak into a job's logs. This proxy keeps capture scoped to the job worker
+    thread while forwarding all other threads to the original streams.
+    """
+
+    def __init__(self, default: io.TextIOBase) -> None:
+        super().__init__()
+        self._default = default
+        self._local = threading.local()
+
+    def set_thread_stream(self, stream: io.TextIOBase | None) -> None:
+        if stream is None:
+            if hasattr(self._local, "stream"):
+                delattr(self._local, "stream")
+            return
+        self._local.stream = stream
+
+    def _stream(self) -> io.TextIOBase:
+        return getattr(self._local, "stream", None) or self._default
+
+    def write(self, s: str) -> int:  # type: ignore[override]
+        return self._stream().write(s)
+
+    def flush(self) -> None:  # type: ignore[override]
+        try:
+            self._stream().flush()
+        except Exception:
+            pass
+
+    def isatty(self) -> bool:  # pragma: no cover - passthrough
+        try:
+            return bool(getattr(self._stream(), "isatty")())
+        except Exception:
+            return False
+
+    @property  # pragma: no cover - passthrough
+    def encoding(self):
+        return getattr(self._stream(), "encoding", None)
+
+    def __getattr__(self, name: str):  # pragma: no cover - passthrough
+        return getattr(self._stream(), name)
+
+
+_STDIO_PROXY_LOCK = threading.Lock()
+_STDOUT_PROXY: _ThreadLocalStreamProxy | None = None
+_STDERR_PROXY: _ThreadLocalStreamProxy | None = None
+
+
+def _ensure_thread_local_stdio_installed() -> tuple[_ThreadLocalStreamProxy, _ThreadLocalStreamProxy]:
+    global _STDOUT_PROXY, _STDERR_PROXY
+    with _STDIO_PROXY_LOCK:
+        if not isinstance(sys.stdout, _ThreadLocalStreamProxy):
+            _STDOUT_PROXY = _ThreadLocalStreamProxy(sys.stdout)  # type: ignore[arg-type]
+            sys.stdout = _STDOUT_PROXY  # type: ignore[assignment]
+        if not isinstance(sys.stderr, _ThreadLocalStreamProxy):
+            _STDERR_PROXY = _ThreadLocalStreamProxy(sys.stderr)  # type: ignore[arg-type]
+            sys.stderr = _STDERR_PROXY  # type: ignore[assignment]
+        if _STDOUT_PROXY is None:
+            _STDOUT_PROXY = sys.stdout  # type: ignore[assignment]
+        if _STDERR_PROXY is None:
+            _STDERR_PROXY = sys.stderr  # type: ignore[assignment]
+        return _STDOUT_PROXY, _STDERR_PROXY
+
+
 class JobHandle:
     """Handle passed to job callables so they can report progress safely."""
 
@@ -131,6 +200,7 @@ class JobRegistry:
     """Central registry that manages background job execution and state."""
 
     def __init__(self, max_workers: int = 4) -> None:
+        _ensure_thread_local_stdio_installed()
         self._jobs: Dict[str, JobState] = {}
         self._futures: Dict[str, Future[Any]] = {}
         self._cancel_callbacks: Dict[str, Callable[[], None]] = {}
@@ -155,17 +225,21 @@ class JobRegistry:
         self._set_status(job_id, JobStatus.RUNNING)
         stdout_stream = _LogStream(self, job_id, "stdout")
         stderr_stream = _LogStream(self, job_id, "stderr")
+        stdout_proxy, stderr_proxy = _ensure_thread_local_stdio_installed()
         try:
-            with contextlib.redirect_stdout(stdout_stream), contextlib.redirect_stderr(stderr_stream):
-                func(handle)
-                # flush any trailing partial lines
-                stdout_stream.flush()
-                stderr_stream.flush()
+            stdout_proxy.set_thread_stream(stdout_stream)
+            stderr_proxy.set_thread_stream(stderr_stream)
+            func(handle)
+            # flush any trailing partial lines
+            stdout_stream.flush()
+            stderr_stream.flush()
         except Exception as exc:
             self.fail_job(job_id, str(exc))
         else:
             self.complete_job(job_id)
         finally:
+            stdout_proxy.set_thread_stream(None)
+            stderr_proxy.set_thread_stream(None)
             self._clear_cancel_callback(job_id)
 
     def complete_job(self, job_id: str) -> None:
@@ -193,8 +267,18 @@ class JobRegistry:
                     for line in buffer:
                         state.logs.append(f"[{timestamp}] [stderr] {line}")
                 else:
-                    state.log_stream_warning = True
-                    state.traceback_suppressed = True
+                    transient_kind = self._transient_kind_any(buffer)
+                    if transient_kind == "transport":
+                        state.log_stream_warning = True
+                        state.traceback_suppressed = True
+                    elif transient_kind == "benign_shutdown":
+                        state.traceback_suppressed = True
+                    else:
+                        # Unexpected/incomplete traceback: surface it to the caller instead
+                        # of silently dropping it just because the job "succeeded".
+                        timestamp = datetime.now(tz=timezone.utc).isoformat()
+                        for line in buffer:
+                            state.logs.append(f"[{timestamp}] [stderr] {line}")
 
     def _set_status(self, job_id: str, status: JobStatus) -> None:
         with self._lock:
@@ -219,10 +303,63 @@ class JobRegistry:
                 timestamp=timestamp,
             ):
                 return
-            if self._is_transient_stream_error(message):
+            transient_kind = self._transient_kind(message)
+            if transient_kind == "transport":
                 state.log_stream_warning = True
                 return
+            if transient_kind == "benign_shutdown":
+                return
             state.logs.append(entry)
+
+    @staticmethod
+    def _transient_kind(message: str) -> str | None:
+        """
+        Classify known transient stderr noise.
+
+        Returns:
+          - "transport" for client disconnect/write errors (actionable log-transport issues)
+          - "benign_shutdown" for Windows/asyncio proactor shutdown noise (non-actionable)
+          - None when not recognized
+        """
+        msg = (message or "").lower()
+
+        # Transport-level disconnect noise (client closed stream, broken pipe, etc.).
+        if "connectionreseterror" in msg:
+            return "transport"
+        if "forcibly closed by the remote host" in msg:
+            return "transport"
+        if "connection reset by peer" in msg:
+            return "transport"
+        if "broken pipe" in msg:
+            return "transport"
+
+        # Common benign shutdown noise seen on Windows (asyncio/proactor + socket teardown).
+        if "exception in callback" in msg and "base_events" in msg:
+            return "benign_shutdown"
+        if "proactor_events.py" in msg or "proactor_events" in msg:
+            return "benign_shutdown"
+        if "_call_connection_lost" in msg:
+            return "benign_shutdown"
+        if "winerror 10038" in msg:
+            return "benign_shutdown"
+        if "an operation was attempted on something that is not a socket" in msg:
+            return "benign_shutdown"
+        return None
+
+    @classmethod
+    def _transient_kind_any(cls, lines: List[str]) -> str | None:
+        """
+        Collapse a set of lines into a single transient classification.
+
+        If any line looks like a transport-level issue, treat the block as transport.
+        Otherwise if any line looks like benign shutdown noise, treat as benign shutdown.
+        """
+        kinds = {cls._transient_kind(line) for line in lines}
+        if "transport" in kinds:
+            return "transport"
+        if "benign_shutdown" in kinds:
+            return "benign_shutdown"
+        return None
 
     def _capture_or_suppress_stderr_traceback_locked(
         self,
@@ -238,7 +375,7 @@ class JobRegistry:
         """
         buffer = self._stderr_tracebacks.get(job_id)
 
-        if message.startswith(_TRACEBACK_START):
+        if message.lstrip().startswith(_TRACEBACK_START):
             self._stderr_tracebacks[job_id] = [message]
             return True
 
@@ -248,12 +385,16 @@ class JobRegistry:
         buffer.append(message)
 
         # Wait until the traceback terminator line before deciding.
-        if not _TRACEBACK_TERMINATOR_RE.match(message.strip()):
+        stripped = message.strip()
+        if stripped.split(" ", 1)[0] in {"ERROR", "WARNING", "INFO", "DEBUG", "CRITICAL"}:
+            stripped = stripped.split(" ", 1)[1].lstrip() if " " in stripped else stripped
+        if not _TRACEBACK_TERMINATOR_RE.match(stripped):
             return True
 
-        transient = any(self._is_transient_stream_error(line) for line in buffer)
-        if transient:
-            state.log_stream_warning = True
+        transient_kind = self._transient_kind_any(buffer)
+        if transient_kind is not None:
+            if transient_kind == "transport":
+                state.log_stream_warning = True
             state.traceback_suppressed = True
             self._stderr_tracebacks.pop(job_id, None)
             return True
@@ -263,28 +404,6 @@ class JobRegistry:
             state.logs.append(f"[{timestamp}] [stderr] {line}")
         self._stderr_tracebacks.pop(job_id, None)
         return True
-
-    @staticmethod
-    def _is_transient_stream_error(message: str) -> bool:
-        msg = message.lower()
-        if "exception in callback" in msg and "proactor" in msg:
-            return True
-        if "connectionreseterror" in msg:
-            return True
-        if "forcibly closed by the remote host" in msg:
-            return True
-        if "connection reset by peer" in msg:
-            return True
-        if "_call_connection_lost" in msg:
-            return True
-        if "broken pipe" in msg:
-            return True
-        # Common benign shutdown noise seen on Windows (asyncio/proactor + socket teardown).
-        if "winerror 10038" in msg:
-            return True
-        if "an operation was attempted on something that is not a socket" in msg:
-            return True
-        return False
 
     def set_result_resource(self, job_id: str, uri: str) -> None:
         with self._lock:

@@ -98,9 +98,11 @@ def get_job_status(job_id: str) -> str:
     Poll the status of a background job started by tools such as start_execute_script_job.
 
     Usage pattern:
-        1. Call a job-starting tool (e.g., start_execute_script_job/start_stage_plan_job) to get a job_id.
+        1. Call a job-starting tool (e.g., start_execute_script_job/start_part_tree_job/start_warp_job) to get a job_id.
         2. Poll get_job_status(job_id) until "status" == "SUCCEEDED" (or FAILED for troubleshooting).
         3. When SUCCEEDED, call read_resource on "result_resource" (resource://jobs/<id>.json) to fetch the artifact.
+           For execute_script jobs, the artifact contains the full post-run transcript under
+           result.transcript (and also result.stdout/result.stderr).
         4. If FAILED, inspect logs/error, address the issue, and optionally restart the job.
 
     Returns:
@@ -108,12 +110,16 @@ def get_job_status(job_id: str) -> str:
             - job_id: the requested identifier
             - status: PENDING | RUNNING | SUCCEEDED | FAILED | CANCELLED (or UNKNOWN when not found)
             - created_at / started_at / finished_at timestamps (ISO 8601, UTC) when available
-            - logs: accumulated stdout/stderr/log entries
+            - logs: incremental stdout/stderr/log entries since the last poll for this job_id
             - result_resource: resource URI containing the job output, if produced
             - error: error description when failed or unknown
             - metadata: any job-specific metadata stored at creation time
             - ok: boolean convenience flag (false when FAILED, CANCELLED, or UNKNOWN)
         Notes:
+            - Logs are delivered incrementally (server-side cursor): once you poll, subsequent calls will
+              only return newly appended entries (or "no new entries"). This is optimized for live streaming.
+            - For post-mortems, prefer reading the job artifact via result_resource (resource://jobs/<id>.json).
+              In particular, execute_script job artifacts include the full transcript.
             - Logs are returned with ANSI escape sequences stripped by default for easier parsing.
             - To return raw logs, append the suffix "_raw" to the job_id (e.g., "<id>_raw").
             - To include live warp telemetry + ETA (best-effort), append the suffix "_warp" (e.g., "<id>_warp").
@@ -168,6 +174,7 @@ def get_job_status(job_id: str) -> str:
                 name=nm,
                 timeout=min(2.0, timeout),
                 target_ut=target_ut,
+                preferred_mode=(params.get("mode") if isinstance(params, dict) else None),
             )
         except Exception as exc:
             extra["warp_progress_error"] = str(exc)

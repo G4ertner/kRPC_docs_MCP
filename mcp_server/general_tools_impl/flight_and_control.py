@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from ..utils.krpc_utils import readers
 from ..utils.json_utils import dumps as json_dumps
 from ..utils.krpc_helpers import (
@@ -83,7 +85,7 @@ def get_camera_status(address: str = DEFAULT_KRPC_ADDRESS, rpc_port: int = 50000
 
 def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, enable_sas: bool = True, rpc_port: int = 50000, stream_port: int = 50001, name: str | None = None, timeout: float = 5.0) -> str:
     """
-    Set SAS on/off and select an SAS hold mode while keeping the simulation running just long enough to align.
+    Set SAS on/off and select an SAS hold mode.
 
     Args:
       mode: One of the SAS modes (stability_assist, prograde, retrograde, normal, anti_normal,
@@ -91,10 +93,11 @@ def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, e
       enable_sas: If true, toggle SAS on before setting the mode.
 
     Returns:
-      Human-readable status string indicating the final SAS mode and whether an orientation alignment was observed.
+      Human-readable status string indicating the final SAS state and SAS mode.
 
     Notes:
-      - Best-effort unpauses before changing SAS and re-pauses after the SAS vector is aligned so you can set a target even while the game starts paused.
+      - Best-effort unpauses before changing SAS and re-pauses afterward so you can set a target even while the game starts paused.
+      - When enabling SAS from an off state, KSP can ignore direct transitions into some hold modes. This function latches SAS on first.
     """
     if mode is None:
         raise ValueError("mode is required")
@@ -107,6 +110,11 @@ def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, e
     try:
         sc = conn.space_center
         ctrl = sc.active_vessel.control
+
+        try:
+            sas_before = bool(getattr(ctrl, "sas"))
+        except Exception:
+            sas_before = False
 
         key = mode.strip().lower().replace("-", "_")
         aliases = {
@@ -128,60 +136,93 @@ def set_sas_mode(address: str = DEFAULT_KRPC_ADDRESS, mode: str | None = None, e
             available = ", ".join(sorted(options))
             return f"Unknown SAS mode '{mode}'. Available: {available}"
 
+        desired_sas = sas_before if enable_sas is None else bool(enable_sas)
+
+        def _read_sas() -> bool:
+            try:
+                return bool(getattr(ctrl, "sas"))
+            except Exception:
+                return False
+
+        def _read_sas_mode():
+            try:
+                return getattr(ctrl, "sas_mode")
+            except Exception:
+                return None
+
+        def _wait_for(predicate, timeout_s: float, step_s: float = 0.05) -> bool:
+            deadline = time.time() + timeout_s
+            while time.time() < deadline:
+                if predicate():
+                    return True
+                time.sleep(step_s)
+            return bool(predicate())
+
+        def _apply_sas_mode(target_mode, timeout_s: float = 1.0, step_s: float = 0.05) -> bool:
+            deadline = time.time() + timeout_s
+            last_ok = False
+            while time.time() < deadline:
+                try:
+                    ctrl.sas_mode = target_mode
+                except Exception:
+                    pass
+                last_ok = _read_sas_mode() == target_mode
+                if last_ok:
+                    return True
+                time.sleep(step_s)
+            return last_ok
+
+        used_stability_latch = False
+        stability_enum = options.get("stability_assist")
+
+        if not desired_sas:
+            try:
+                ctrl.sas = False
+            except Exception:
+                pass
+            return f"SAS set to off (sas={_read_sas()})."
+
         try:
-            if enable_sas is not None:
-                ctrl.sas = bool(enable_sas)
+            ctrl.sas = True
         except Exception:
             pass
 
-        ctrl.sas_mode = sas_enum
-        sas_enabled = getattr(ctrl, "sas", True)
-        aligned = False
-        if sas_enabled:
-            autop = sc.active_vessel.auto_pilot
-            prev_frame = None
+        sas_enabled = _wait_for(_read_sas, timeout_s=1.0)
+        if not sas_enabled and stability_enum is not None:
+            # One more attempt: force stability assist, then enable SAS again.
             try:
-                prev_frame = getattr(autop, "reference_frame", None)
-            except Exception:
-                prev_frame = None
-            orbital_frame = None
-            try:
-                orbital_frame = sc.active_vessel.orbital_reference_frame
-            except Exception:
-                orbital_frame = None
-            try:
-                if orbital_frame is not None:
-                    autop.reference_frame = orbital_frame
+                ctrl.sas_mode = stability_enum
+                used_stability_latch = True
             except Exception:
                 pass
             try:
-                autop.engage()
-                try:
-                    autop.sas = True
-                except Exception:
-                    pass
-                try:
-                    autop.sas_mode = sas_enum
-                except Exception:
-                    pass
-                autop.wait()
-                aligned = True
+                ctrl.sas = True
             except Exception:
                 pass
-            finally:
-                try:
-                    autop.reference_frame = prev_frame
-                except Exception:
-                    pass
-                try:
-                    autop.disengage()
-                except Exception:
-                    pass
+            sas_enabled = _wait_for(_read_sas, timeout_s=1.0)
 
-        status = f"SAS mode set to {getattr(sas_enum, 'name', key)} (sas={sas_enabled})."
-        if sas_enabled:
-            status += " Orientation aligned." if aligned else " Orientation alignment not confirmed."
-        return status
+        if not sas_enabled:
+            return f"Failed to enable SAS; requested mode {getattr(sas_enum, 'name', key)} (sas={_read_sas()})."
+
+        # When coming from SAS-off, KSP often needs SAS to be enabled (and usually in stability assist)
+        # for at least one tick before switching into other hold modes.
+        if not sas_before and stability_enum is not None and sas_enum != stability_enum:
+            if _apply_sas_mode(stability_enum, timeout_s=1.0):
+                used_stability_latch = True
+                time.sleep(0.15)
+
+        mode_applied = _apply_sas_mode(sas_enum, timeout_s=1.0)
+        time.sleep(0.15)
+        # Confirm it persists after a couple of physics frames.
+        mode_applied = mode_applied and (_read_sas_mode() == sas_enum)
+
+        sas_enabled = _read_sas()
+        suffix = ""
+        if used_stability_latch:
+            suffix = " (latched via stability_assist)"
+        if mode_applied:
+            return f"SAS mode set to {getattr(sas_enum, 'name', key)} (sas={sas_enabled}){suffix}."
+        return f"SAS enabled but mode not confirmed as {getattr(sas_enum, 'name', key)} (sas={sas_enabled}, sas_mode={getattr(_read_sas_mode(), 'name', _read_sas_mode())}){suffix}."
     except Exception as e:
         return f"Failed to set SAS mode: {e}"
     finally:

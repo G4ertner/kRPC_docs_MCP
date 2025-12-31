@@ -170,7 +170,6 @@ class InjectionAwareToolManager(ToolManager):
         # Long-running job starters and execute_script manage their own timeouts.
         no_timeout_tools = {
             "start_part_tree_job",
-            "start_stage_plan_job",
             "start_warp_job",
             "start_execute_script_job",
             "execute_script",
