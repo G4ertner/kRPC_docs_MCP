@@ -646,9 +646,40 @@ Success criteria:
 
 ---
 
-## Notes and pitfalls observed
+## Regression check plan (transfer windows)
 
-- `get_screenshot` failed with a permission error writing under the MCP server's `artifacts/screenshots` path. If you need screenshots for warp tests, ensure the MCP server's artifact directory is writable from the process environment.
-- Encoding: avoid printing non-ASCII symbols (e.g. "->") in scripts; on Windows this can raise `UnicodeEncodeError` (cp1252).
-- `settle_at_s` behavior: large values (e.g., 600) can cause the warp job to intentionally drop to realtime for minutes before completion; keep it small (30-120) for regression tests.
-- Reference frames: for interplanetary angles, `central.non_rotating_reference_frame` with `atan2(z, x)` ("x-z plane") was stable in this save; if your results look nonsensical, verify axis/plane choice by sampling phase drift over ~60s.
+Goal: confirm `compute_transfer_window_to_body` matches the position-based solver above.
+
+Preflight:
+- Ensure the active vessel is in the origin body's SOI (e.g., on the Kerbin pad or in Kerbin orbit).
+- Set timewarp to 1x.
+
+Checks (run in order):
+1) Interplanetary, outward (Kerbin -> Duna)
+   - Run `mcp__geept_mcp__compute_transfer_window_to_body({ body_name: "Duna" })`.
+   - Run Step A script above (ORIGIN_NAME="Kerbin", TARGET_NAME="Duna").
+   - Compare:
+     - `phase_now_deg` vs `PHASE_NOW_DEG` (within ~2 deg).
+     - `time_to_window_s` vs `TIME_TO_WINDOW_S` (within ~2% or <= 1 hour for long windows).
+
+2) Interplanetary, inward (Kerbin -> Eve)
+   - Same comparison as above but with TARGET_NAME="Eve".
+
+3) Moon transfer (Kerbin -> Mun)
+   - Run `mcp__geept_mcp__compute_transfer_window_to_body({ body_name: "Mun" })`.
+   - Run a moon-variant of Step A:
+     - Set `central = origin` (not origin.orbit.body).
+     - Use `r1 = vessel.orbit.periapsis_altitude + origin.equatorial_radius`.
+     - Use `p_origin = vessel.orbit.position_at(ut, central.non_rotating_reference_frame)`.
+     - Use `p_target = target.orbit.position_at(ut, central.non_rotating_reference_frame)`.
+   - Compare the same telemetry fields (tolerances as above).
+
+Pass criteria:
+- All three cases meet tolerance; no `error` in tool output.
+
+Notes:
+- If a result is off, re-run both calculations at the same UT and confirm the vessel is still in the origin body's SOI.
+- For very early windows (time_to_window < 1 hour), prioritize absolute error (minutes) over percent error.
+
+---
+

@@ -667,6 +667,41 @@ def _phase_angle_deg(p1, p2) -> float | None:
         return None
 
 
+def _theta_xz_deg(p) -> float | None:
+    try:
+        x = float(p[0])
+        z = float(p[2])
+        return (atan2(z, x) * 180.0 / 3.141592653589793) % 360.0
+    except Exception:
+        return None
+
+
+def _phase_angle_xz_deg(p_origin, p_target) -> float | None:
+    try:
+        a1 = _theta_xz_deg(p_origin)
+        a2 = _theta_xz_deg(p_target)
+        if a1 is None or a2 is None:
+            return None
+        return (a2 - a1) % 360.0
+    except Exception:
+        return None
+
+
+def _solve_next_window_dt(phase_now_deg: float | None, phase_required_deg: float | None, w_deg_s: float) -> tuple[float | None, int | None]:
+    if phase_now_deg is None or phase_required_deg is None:
+        return None, None
+    if abs(w_deg_s) < 1e-12:
+        return None, None
+    best_dt = None
+    best_k = None
+    for k in range(-6, 7):
+        dt = (phase_required_deg - phase_now_deg + 360.0 * k) / w_deg_s
+        if dt > 0 and (best_dt is None or dt < best_dt):
+            best_dt = dt
+            best_k = k
+    return best_dt, best_k
+
+
 def _normalize(v):
     try:
         nx = float(v[0]); ny = float(v[1]); nz = float(v[2])
@@ -2052,14 +2087,13 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
 
     result: Dict[str, object] = {"target": getattr(tb, 'name', target_body_name)}
 
-    # Moon transfer (target orbits vessel body)
     # Moon transfer: target orbits vessel body (compare by name to avoid proxy identity issues)
     if name_parent_t is not None and name_parent_t == name_vb:
         ref = getattr(vb, 'non_rotating_reference_frame', vb.reference_frame)
         try:
-            p_v = v.position(ref)
-            p_t = tb.position(ref)
-            phase_now = _phase_angle_deg(p_v, p_t)
+            p_v = v.orbit.position_at(ut0, ref)
+            p_t = tb.orbit.position_at(ut0, ref)
+            phase_now = _phase_angle_xz_deg(p_v, p_t)
         except Exception:
             phase_now = None
         # Radii
@@ -2072,20 +2106,16 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
         r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))  # approx circular
         a_trans = 0.5 * (r1 + r2)
         t_trans = pi * sqrt(a_trans**3 / mu)
-        P2 = getattr(tb.orbit, 'period', None)
-        P2 = float(P2) if P2 else None
+        P1 = float(getattr(v.orbit, 'period', 0.0)) or None
+        P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
         phase_required = None
-        if P2:
-            phase_required = 180.0 - (360.0 * (t_trans / P2))
-        # Synodic period between current orbital angular rate and moon's
-        P1 = getattr(v.orbit, 'period', None)
-        P1 = float(P1) if P1 else None
-        time_to_window = None
-        if P1 and P2 and phase_now is not None and phase_required is not None:
-            Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2)) if abs(1.0 / P1 - 1.0 / P2) > 0 else None
-            if Psyn:
-                err = _wrap_deg(phase_required - phase_now)
-                time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+        w_deg_s = 0.0
+        if P1 and P2:
+            n1 = 360.0 / P1
+            n2 = 360.0 / P2
+            w_deg_s = n2 - n1
+            phase_required = (180.0 - n2 * t_trans) % 360.0
+        time_to_window, _k_wrap = _solve_next_window_dt(phase_now, phase_required, w_deg_s)
         result.update({
             "frame": "moon",
             "r1_m": r1,
@@ -2104,9 +2134,9 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
     if name_parent_v is not None and name_parent_v == name_parent_t:
         ref = getattr(parent_v, 'non_rotating_reference_frame', parent_v.reference_frame)
         try:
-            p_vb = vb.position(ref)
-            p_tb = tb.position(ref)
-            phase_now = _phase_angle_deg(p_vb, p_tb)
+            p_vb = vb.orbit.position_at(ut0, ref)
+            p_tb = tb.orbit.position_at(ut0, ref)
+            phase_now = _phase_angle_xz_deg(p_vb, p_tb)
         except Exception:
             phase_now = None
         mu = getattr(parent_v, 'gravitational_parameter', None)
@@ -2121,15 +2151,11 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
         P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
         if r1 <= 0 or r2 <= 0 or not P1 or not P2:
             return {"error": "Invalid orbital parameters"}
-        if r1 < r2:
-            phase_required = 180.0 - (360.0 * (t_trans / P2))
-        else:
-            phase_required = 180.0 + (360.0 * (t_trans / P1))
-        Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
-        time_to_window = None
-        if phase_now is not None:
-            err = _wrap_deg(phase_required - phase_now)
-            time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+        n1 = 360.0 / P1
+        n2 = 360.0 / P2
+        w_deg_s = n2 - n1
+        phase_required = (180.0 - n2 * t_trans) % 360.0
+        time_to_window, _k_wrap = _solve_next_window_dt(phase_now, phase_required, w_deg_s)
         result.update({
             "frame": "interplanetary",
             "r1_m": r1,
@@ -2143,6 +2169,45 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
         })
         return result
 
+    # Heuristic moon-case fallback: if target SMA is much less than your body's SOI, treat as moon case
+    try:
+        mu = getattr(vb, 'gravitational_parameter', None)
+        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
+        soi = float(getattr(vb, 'sphere_of_influence', 0.0))
+        if mu and r2 and soi and r2 < 0.8 * soi:
+            ref = getattr(vb, 'non_rotating_reference_frame', vb.reference_frame)
+            p_v = v.orbit.position_at(ut0, ref)
+            p_t = tb.orbit.position_at(ut0, ref)
+            phase_now = _phase_angle_xz_deg(p_v, p_t)
+            from math import sqrt, pi
+            R = getattr(vb, 'equatorial_radius', 0.0) or 0.0
+            r1 = float(getattr(v.orbit, 'periapsis_altitude', 0.0) + R)
+            a_trans = 0.5 * (r1 + r2)
+            t_trans = pi * sqrt(a_trans**3 / mu)
+            P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
+            P1 = float(getattr(v.orbit, 'period', 0.0)) or None
+            phase_required = None
+            w_deg_s = 0.0
+            if P1 and P2:
+                n1 = 360.0 / P1
+                n2 = 360.0 / P2
+                w_deg_s = n2 - n1
+                phase_required = (180.0 - n2 * t_trans) % 360.0
+            time_to_window, _k_wrap = _solve_next_window_dt(phase_now, phase_required, w_deg_s)
+            return {
+                "frame": "moon",
+                "r1_m": r1,
+                "r2_m": r2,
+                "transfer_time_s": t_trans,
+                "phase_now_deg": phase_now,
+                "phase_required_deg": phase_required,
+                "phase_error_deg": _wrap_deg((phase_required - phase_now) if (phase_now is not None and phase_required is not None) else 0.0) if (phase_now is not None and phase_required is not None) else None,
+                "time_to_window_s": time_to_window,
+                "ut_window": (ut0 + time_to_window) if time_to_window else None,
+            }
+    except Exception:
+        pass
+
     # Fallbacks using star inference
     try:
         bodies = getattr(sc, 'bodies', {}) or {}
@@ -2155,9 +2220,9 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
     if name_star and ((name_parent_v in (None, name_star)) and (name_parent_t in (None, name_star))):
         ref = getattr(star, 'non_rotating_reference_frame', getattr(star, 'reference_frame', None))
         try:
-            p_vb = vb.position(ref)
-            p_tb = tb.position(ref)
-            phase_now = _phase_angle_deg(p_vb, p_tb)
+            p_vb = vb.orbit.position_at(ut0, ref)
+            p_tb = tb.orbit.position_at(ut0, ref)
+            phase_now = _phase_angle_xz_deg(p_vb, p_tb)
         except Exception:
             phase_now = None
         mu = getattr(star, 'gravitational_parameter', None)
@@ -2172,15 +2237,11 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
             P1 = float(getattr(vb.orbit, 'period', 0.0)) or None
             P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
             if P1 and P2:
-                if r1 < r2:
-                    phase_required = 180.0 - (360.0 * (t_trans / P2))
-                else:
-                    phase_required = 180.0 + (360.0 * (t_trans / P1))
-                Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
-                time_to_window = None
-                if phase_now is not None:
-                    err = _wrap_deg(phase_required - phase_now)
-                    time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+                n1 = 360.0 / P1
+                n2 = 360.0 / P2
+                w_deg_s = n2 - n1
+                phase_required = (180.0 - n2 * t_trans) % 360.0
+                time_to_window, _k_wrap = _solve_next_window_dt(phase_now, phase_required, w_deg_s)
                 return {
                     "frame": "interplanetary",
                     "r1_m": r1,
@@ -2192,43 +2253,6 @@ def propose_transfer_window_to_body(conn, target_body_name: str) -> Dict[str, ob
                     "time_to_window_s": time_to_window,
                     "ut_window": (ut0 + time_to_window) if time_to_window else None,
                 }
-
-    # Heuristic moon-case fallback: if target SMA is much less than your body's SOI, treat as moon case
-    try:
-        mu = getattr(vb, 'gravitational_parameter', None)
-        r2 = float(getattr(tb.orbit, 'semi_major_axis', 0.0))
-        soi = float(getattr(vb, 'sphere_of_influence', 0.0))
-        if mu and r2 and soi and r2 < 0.8 * soi:
-            ref = getattr(vb, 'non_rotating_reference_frame', vb.reference_frame)
-            p_v = v.position(ref); p_t = tb.position(ref)
-            phase_now = _phase_angle_deg(p_v, p_t)
-            from math import sqrt, pi
-            R = getattr(vb, 'equatorial_radius', 0.0) or 0.0
-            r1 = float(getattr(v.orbit, 'periapsis_altitude', 0.0) + R)
-            a_trans = 0.5 * (r1 + r2)
-            t_trans = pi * sqrt(a_trans**3 / mu)
-            P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
-            phase_required = 180.0 - (360.0 * (t_trans / P2)) if P2 else None
-            P1 = float(getattr(v.orbit, 'period', 0.0)) or None
-            time_to_window = None
-            if P1 and P2 and phase_now is not None and phase_required is not None:
-                Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2)) if abs(1.0 / P1 - 1.0 / P2) > 0 else None
-                if Psyn:
-                    err = _wrap_deg(phase_required - phase_now)
-                    time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
-            return {
-                "frame": "moon",
-                "r1_m": r1,
-                "r2_m": r2,
-                "transfer_time_s": t_trans,
-                "phase_now_deg": phase_now,
-                "phase_required_deg": phase_required,
-                "phase_error_deg": _wrap_deg((phase_required - phase_now) if (phase_now is not None and phase_required is not None) else 0.0) if (phase_now is not None and phase_required is not None) else None,
-                "time_to_window_s": time_to_window,
-                "ut_window": (ut0 + time_to_window) if time_to_window else None,
-            }
-    except Exception:
-        pass
 
     return {"error": "Target body must be a moon of the current body or share a parent with it"}
 
@@ -2274,23 +2298,19 @@ def propose_ejection_node_to_body(conn, target_body_name: str, parking_alt_m: fl
     P2 = float(getattr(tb.orbit, 'period', 0.0)) or None
     if r1 <= 0 or r2 <= 0 or not P1 or not P2:
         return {"error": "Invalid orbital parameters"}
-    if r1 < r2:
-        phase_required = 180.0 - (360.0 * (t_trans / P2))
-    else:
-        phase_required = 180.0 + (360.0 * (t_trans / P1))
+    n1 = 360.0 / P1
+    n2 = 360.0 / P2
+    w_deg_s = n2 - n1
+    phase_required = (180.0 - n2 * t_trans) % 360.0
     # Current phase
     ref = getattr(parent_v, 'non_rotating_reference_frame', parent_v.reference_frame)
     try:
-        p_vb = vb.position(ref)
-        p_tb = tb.position(ref)
-        phase_now = _phase_angle_deg(p_vb, p_tb)
+        p_vb = vb.orbit.position_at(sc.ut, ref)
+        p_tb = tb.orbit.position_at(sc.ut, ref)
+        phase_now = _phase_angle_xz_deg(p_vb, p_tb)
     except Exception:
         phase_now = None
-    Psyn = abs(1.0 / (1.0 / P1 - 1.0 / P2))
-    time_to_window = None
-    if phase_now is not None:
-        err = _wrap_deg(phase_required - phase_now)
-        time_to_window = (_wrap_deg_pos(err) / 360.0) * Psyn
+    time_to_window, _k_wrap = _solve_next_window_dt(phase_now, phase_required, w_deg_s)
     ut_window = (sc.ut + time_to_window) if time_to_window else None
     # v_inf at departure
     v1 = sqrt(mu_p / r1)
